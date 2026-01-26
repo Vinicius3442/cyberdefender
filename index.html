@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <title>Browser FPS</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+
+    <div id="ui-layer">
+        <div id="crosshair"></div>
+        <div id="hud">
+            <div class="hud-item">HP: <span id="hp-display">100</span></div>
+            <div class="hud-item">WAVE: <span id="wave-display">1</span></div>
+            <div class="hud-item">WEAPON: <span id="weapon-display">Pistol</span></div>
+            <div class="hud-item" id="ammo-container">AMMO: <span id="ammo-display">∞</span></div>
+        </div>
+
+        <div id="wave-progress-container">
+            <div id="wave-progress-bar"></div>
+            <div id="wave-progress-text">WAVE PROGRESS</div>
+        </div>
+
+        <div id="start-screen">
+            <h1 class="glitch" data-text="BROWSER FPS">BROWSER FPS</h1>
+
+            <div class="menu-container">
+                <div class="input-group">
+                    <label>CODENAME</label>
+                    <input type="text" id="player-name" placeholder="Enter Name" value="Soldier">
+                </div>
+
+                <div class="input-group">
+                    <label>SKIN (PNG)</label>
+                    <input type="file" id="player-skin" accept="image/png">
+                </div>
+
+                <div class="button-group">
+                    <button id="btn-play" class="menu-btn primary">PLAY</button>
+                    <button id="btn-config" class="menu-btn secondary">CONFIG</button>
+                </div>
+            </div>
+
+            <div class="controls-hint">
+                WASD Move | R Reload | P Pause | Right Click Zoom
+            </div>
+        </div>
+
+        <div id="game-over-screen" style="display: none;">
+            <h1>MISSION FAILED</h1>
+            <p id="final-score">Wave Reached: 1</p>
+            <button id="btn-restart" class="menu-btn primary" onclick="location.reload()">RETRY</button>
+        </div>
+
+        <div id="upgrade-screen" style="display: none;">
+            <h2>CHOOSE UPGRADE</h2>
+            <div id="upgrade-options">
+                <!-- Cards injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>

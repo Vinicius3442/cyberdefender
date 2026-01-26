@@ -1,0 +1,279 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+    font-family: 'Cinzel', serif;
+    user-select: none;
+    color: #d4af37;
+    /* Gold */
+}
+
+#game-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* HUD */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    background: #d4af37;
+    border-radius: 50%;
+    box-shadow: 0 0 4px #d4af37;
+}
+
+#hud {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    display: flex;
+    gap: 15px;
+}
+
+.hud-item {
+    background: rgba(10, 0, 0, 0.8);
+    border: 2px solid #500;
+    padding: 10px 20px;
+    font-size: 24px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 0 10px rgba(100, 0, 0, 0.5);
+    color: #d4af37;
+}
+
+.hud-item span {
+    color: #fff;
+}
+
+/* SCREENS */
+#start-screen,
+#game-over-screen,
+#upgrade-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(5, 0, 0, 0.95);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    background-image: radial-gradient(circle, #200 0%, #000 100%);
+}
+
+/* MENU */
+h1 {
+    font-family: 'UnifrakturMaguntia', cursive;
+    font-size: 100px;
+    margin: 0 0 40px 0;
+    color: #d40000;
+    text-shadow: 0 0 10px rgba(200, 0, 0, 0.5);
+    letter-spacing: 5px;
+}
+
+.menu-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 300px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    text-align: left;
+}
+
+.input-group label {
+    font-size: 14px;
+    color: #888;
+    margin-left: 5px;
+}
+
+input[type="text"] {
+    background: #100;
+    border: 1px solid #500;
+    padding: 12px;
+    color: #d4af37;
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus {
+    border-color: #d4af37;
+}
+
+input[type="file"] {
+    font-size: 14px;
+    color: #888;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.menu-btn {
+    padding: 15px;
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: bold;
+    border: 2px solid #500;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    letter-spacing: 2px;
+    background: #200;
+    color: #d4af37;
+}
+
+.menu-btn.primary:hover {
+    background: #500;
+    color: #fff;
+    box-shadow: 0 0 25px rgba(200, 0, 0, 0.6);
+    transform: scale(1.02);
+}
+
+.menu-btn.secondary {
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+}
+
+.menu-btn.secondary:hover {
+    border-color: #d4af37;
+    color: #d4af37;
+}
+
+.controls-hint {
+    margin-top: 50px;
+    color: #666;
+    font-size: 14px;
+}
+
+/* CARDS (Playing Card Style - Realistic) */
+#upgrade-options {
+    display: flex;
+    gap: 30px;
+    perspective: 1000px;
+}
+
+.upgrade-card {
+    width: 220px;
+    height: 320px;
+    background: white;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 15px;
+    box-sizing: border-box;
+    color: black;
+    font-family: 'Courier New', Courier, monospace;
+    /* Standard card font */
+    border: 1px solid #ddd;
+}
+
+.upgrade-card:hover {
+    transform: translateY(-20px) rotateY(10deg);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+    z-index: 10;
+}
+
+/* Card Corner Ranks */
+.card-rank {
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.card-rank.top-left {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+.card-rank.bottom-right {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    transform: rotate(180deg);
+}
+
+/* Card Center Content */
+.card-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    margin: 30px 0;
+    border: 1px solid #eee;
+    /* Inner border like some cards */
+    padding: 10px;
+}
+
+.card-suit {
+    font-size: 60px;
+    margin-bottom: 15px;
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    font-family: 'Cinzel', serif;
+}
+
+.card-desc {
+    font-size: 12px;
+    color: #555;
+    font-family: 'Cinzel', serif;
+}
+
+/* Colors */
+.card-red {
+    color: #d40000;
+}
+
+.card-black {
+    color: #111;
+}
