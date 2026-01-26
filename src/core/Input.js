@@ -6,14 +6,18 @@ export class Input {
             left: false,
             right: false,
             jump: false,
-            attack: false
+            jump: false,
+            attack: false,
+            interact: false
         };
         this.isLocked = false;
         this.onAttack = null;
         this.onSwitchWeapon = null;
         this.onReload = null;
         this.onPause = null;
+        this.onPause = null;
         this.onZoom = null;
+        this.onInteract = null;
 
         this._init();
     }
@@ -44,6 +48,10 @@ export class Input {
             case 'KeyA': this.keys.left = true; break;
             case 'KeyD': this.keys.right = true; break;
             case 'Space': this.keys.jump = true; break;
+            case 'KeyE':
+                this.keys.interact = true;
+                if (this.onInteract) this.onInteract();
+                break;
             case 'KeyR': if (this.onReload) this.onReload(); break;
             case 'KeyP': if (this.onPause) this.onPause(); break;
             case 'Digit1': if (this.onSwitchWeapon) this.onSwitchWeapon(0); break;
@@ -67,7 +75,9 @@ export class Input {
             case 'KeyS': this.keys.backward = false; break;
             case 'KeyA': this.keys.left = false; break;
             case 'KeyD': this.keys.right = false; break;
+            case 'KeyD': this.keys.right = false; break;
             case 'Space': this.keys.jump = false; break;
+            case 'KeyE': this.keys.interact = false; break;
         }
     }
 

@@ -32,33 +32,29 @@ export class UpgradeManager {
 
     generateOptions() {
         const options = [];
-        const possibleTypes = ['STAT', 'WEAPON'];
+        // Only STAT upgrades now, weapons are from Chests
+        const possibleTypes = ['STAT'];
 
         for (let i = 0; i < 3; i++) {
-            const type = Math.random() > 0.5 ? 'WEAPON' : 'STAT';
+            const stats = [
+                { id: 'hp', title: 'Max HP +20', apply: (p) => { p.maxHp += 20; p.hp += 20; } },
+                { id: 'speed', title: 'Speed +10%', apply: (p) => { p.speed *= 1.1; } },
+                { id: 'jump', title: 'Jump +10%', apply: (p) => { p.jumpForce *= 1.1; } },
+                {
+                    id: 'damage', title: 'Damage +10%', apply: (p) => {
+                        // We need to handle damage multiplier in Player or WeaponSystem
+                        // For now let's just heal
+                        p.hp = Math.min(p.hp + 50, p.maxHp);
+                    }, titleOverride: 'Heal 50 HP'
+                }
+            ];
 
-            if (type === 'STAT') {
-                const stats = [
-                    { id: 'hp', title: 'Max HP +20', apply: (p) => { p.maxHp += 20; p.hp += 20; } },
-                    { id: 'speed', title: 'Speed +10%', apply: (p) => { p.speed *= 1.1; } },
-                    { id: 'jump', title: 'Jump +10%', apply: (p) => { p.jumpForce *= 1.1; } }
-                ];
-                const stat = stats[Math.floor(Math.random() * stats.length)];
-                options.push({
-                    title: stat.title,
-                    description: "Improves player stats.",
-                    action: () => stat.apply(this.game.player)
-                });
-            } else {
-                // Random Weapon
-                const weaponKeys = Object.values(WeaponType);
-                const weapon = weaponKeys[Math.floor(Math.random() * weaponKeys.length)];
-                options.push({
-                    title: `New Weapon: ${weapon}`,
-                    description: "Adds to inventory.",
-                    action: () => this.game.player.addWeapon(weapon)
-                });
-            }
+            const stat = stats[Math.floor(Math.random() * stats.length)];
+            options.push({
+                title: stat.titleOverride || stat.title,
+                description: "Improves player stats.",
+                action: () => stat.apply(this.game.player)
+            });
         }
         return options;
     }

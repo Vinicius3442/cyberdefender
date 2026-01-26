@@ -4,6 +4,8 @@ import { Player } from '../entities/Player.js';
 import { WaveManager } from '../systems/WaveManager.js';
 import { Collision } from '../systems/Collision.js';
 import { UpgradeManager } from '../systems/UpgradeManager.js';
+import { ParticleSystem } from '../systems/ParticleSystem.js';
+import { Chest } from '../entities/Chest.js';
 
 export class Game {
     constructor() {
@@ -15,9 +17,11 @@ export class Game {
         this.waveManager = null;
         this.collision = null;
         this.upgradeManager = null;
+        this.particleSystem = null;
         this.clock = new THREE.Clock();
         this.projectiles = [];
         this.enemies = [];
+        this.chests = [];
         this.isPaused = false;
 
         this.init();
@@ -87,14 +91,19 @@ export class Game {
         // Input
         this.input = new Input();
         this.input.onPause = () => this.togglePause();
+        this.input.onInteract = () => this.checkInteraction();
 
         // Player
         this.player = new Player(this.camera, this.input, this.scene, this.projectiles, this.playerSkinURL);
 
         // Systems
+        this.particleSystem = new ParticleSystem(this.scene);
         this.upgradeManager = new UpgradeManager(this);
-        this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager);
-        this.collision = new Collision(this.player, this.enemies, this.projectiles);
+        this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
+        this.collision = new Collision(this.player, this.enemies, this.projectiles, this.particleSystem);
+
+        // Pass particle system to player for slash effects
+        this.player.particleSystem = this.particleSystem;
 
         // Events
         window.addEventListener('resize', () => this.onWindowResize(), false);
@@ -120,6 +129,25 @@ export class Game {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    checkInteraction() {
+        if (this.chests.length === 0) return;
+
+        const playerPos = this.player.position;
+        for (const chest of this.chests) {
+            if (chest.isOpened) continue;
+            if (playerPos.distanceTo(chest.position) < 3.0) {
+                chest.open();
+                this.waveManager.onChestOpened();
+
+                // Visuals
+                if (this.particleSystem) {
+                    this.particleSystem.createExplosion(chest.position, 0xFFD700, 30);
+                }
+                break; // Only open one at a time
+            }
+        }
     }
 
     animate() {
@@ -158,6 +186,17 @@ export class Game {
             // Update Systems
             this.waveManager.update(dt);
             this.collision.update();
+            this.particleSystem.update(dt);
+
+            // Update Chests
+            for (let i = this.chests.length - 1; i >= 0; i--) {
+                const chest = this.chests[i];
+                chest.update(dt);
+                if (chest.shouldRemove) {
+                    this.scene.remove(chest.mesh);
+                    this.chests.splice(i, 1);
+                }
+            }
         }
 
         this.renderer.render(this.scene, this.camera);

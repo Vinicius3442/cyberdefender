@@ -29,18 +29,7 @@ export class Player {
         // Inventory
         this.inventory = [
             WeaponType.PISTOL,
-            WeaponType.SHOTGUN,
-            WeaponType.SMG,
-            WeaponType.RIFLE,
-            WeaponType.LMG,
-            WeaponType.SNIPER,
-            WeaponType.LASER,
-            WeaponType.CROSSBOW,
-            WeaponType.LAUNCHER,
-            WeaponType.BFG,
-            WeaponType.SWORD,
-            WeaponType.KATANA,
-            WeaponType.AXE
+            WeaponType.SWORD
         ];
         this.currentSlot = 0;
         this.weaponState = {}; // Store ammo per weapon type
@@ -272,11 +261,7 @@ export class Player {
         this.camera.quaternion.setFromEuler(this.eulerAngles);
     }
 
-    attack() {
-        if (this.isDead || this.attackCooldown > 0) return;
-
-        // Check Ammo
-
+    reload() {
         const type = this.getCurrentWeaponType();
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
@@ -292,6 +277,125 @@ export class Player {
         if (model) {
             model.rotation.x -= 0.5;
             setTimeout(() => model.rotation.x += 0.5, 200);
+        }
+    }
+
+    attack() {
+        if (this.isDead || this.attackCooldown > 0) return;
+
+        const type = this.getCurrentWeaponType();
+        const config = WeaponConfig[type];
+        const state = this.weaponState[type];
+
+        // Check Ammo
+        if (config.ammo !== Infinity) {
+            if (state.ammo <= 0) {
+                this.reload(); // Auto-reload on empty
+                return;
+            }
+        }
+
+        // Decrement Ammo
+        if (config.ammo !== Infinity) {
+            state.ammo--;
+            this.updateAmmoDisplay();
+        }
+
+        this.attackCooldown = config.fireRate;
+
+        // Visual feedback (Recoil / Swing)
+        const model = this.weaponModels[type];
+        if (model) {
+            if (config.isMelee) {
+                // Swing Animation
+                const initialRot = model.rotation.clone();
+                const initialPos = model.position.clone();
+
+                // 1. Wind up
+                model.rotation.x -= 0.5;
+                model.rotation.y += 0.5;
+                model.position.x += 0.1;
+
+                setTimeout(() => {
+                    // 2. Swing
+                    model.rotation.x += 1.5; // Swing down
+                    model.rotation.y -= 1.0; // Swing across
+                    model.position.x -= 0.2;
+                    model.position.z -= 0.2; // Thrust forward
+
+                    // Slash Effect
+                    if (this.particleSystem) {
+                        const slashPos = this.camera.position.clone().add(
+                            this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(1.5)
+                        );
+                        // Randomize slash angle
+                        const slashRot = this.camera.quaternion.clone();
+                        const roll = (Math.random() - 0.5) * 1.0;
+                        slashRot.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll));
+
+                        this.particleSystem.createSlash(slashPos, slashRot);
+                    }
+
+                    setTimeout(() => {
+                        // 3. Return
+                        model.rotation.copy(initialRot);
+                        model.position.copy(initialPos);
+                    }, 150);
+                }, 50);
+
+            } else {
+                // Gun Recoil
+                model.rotation.x += 0.1;
+                model.position.z += 0.05;
+                setTimeout(() => {
+                    model.rotation.x -= 0.1;
+                    model.position.z -= 0.05;
+                }, 50);
+            }
+        }
+
+        // Melee
+        if (config.isMelee) {
+            this.isAttacking = true;
+            setTimeout(() => this.isAttacking = false, 200);
+            return;
+        }
+
+        // Projectile
+        const direction = new THREE.Vector3();
+        this.camera.getWorldDirection(direction);
+
+        const pellets = config.pellets || 1;
+
+        for (let i = 0; i < pellets; i++) {
+            const spread = config.spread || 0;
+            const spreadDir = direction.clone();
+
+            if (spread > 0) {
+                spreadDir.x += (Math.random() - 0.5) * spread;
+                spreadDir.y += (Math.random() - 0.5) * spread;
+                spreadDir.z += (Math.random() - 0.5) * spread;
+                spreadDir.normalize();
+            }
+
+            const spawnPos = this.camera.position.clone().add(spreadDir.clone().multiplyScalar(1.0));
+
+            const projectile = new Projectile(spawnPos, spreadDir, true);
+            projectile.damage = config.damage;
+            projectile.velocity = spreadDir.clone().multiplyScalar(config.projectileSpeed || 20);
+            projectile.mesh.material.color.setHex(config.color || 0xffff00);
+
+            if (type === WeaponType.BFG) {
+                projectile.isBFG = true;
+                projectile.radius = config.radius;
+                projectile.mesh.geometry = new THREE.SphereGeometry(0.5, 16, 16);
+            } else if (type === WeaponType.LAUNCHER) {
+                projectile.isExplosive = true;
+                projectile.explosionRadius = config.radius;
+            }
+
+            this.scene.add(projectile.mesh);
+            this.projectiles.push(projectile);
         }
     }
 

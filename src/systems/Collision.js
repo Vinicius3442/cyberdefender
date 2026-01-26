@@ -3,10 +3,11 @@ import { Utils } from '../core/Utils.js';
 import { ExplosiveEnemy } from '../entities/ExplosiveEnemy.js';
 
 export class Collision {
-    constructor(player, enemies, projectiles) {
+    constructor(player, enemies, projectiles, particleSystem) {
         this.player = player;
         this.enemies = enemies;
         this.projectiles = projectiles;
+        this.particleSystem = particleSystem;
     }
 
     update() {
@@ -110,6 +111,9 @@ export class Collision {
     createExplosion(position, radius, damage, damagePlayer) {
         // Visual debug (optional)
         // console.log("Boom at", position);
+        if (this.particleSystem) {
+            this.particleSystem.createExplosion(position, 0xffaa00, 20);
+        }
 
         // Damage Enemies
         for (const enemy of this.enemies) {
