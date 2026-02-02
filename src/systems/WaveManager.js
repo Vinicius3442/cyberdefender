@@ -5,7 +5,6 @@ import { SniperEnemy } from '../entities/SniperEnemy.js';
 import { ExplosiveEnemy } from '../entities/ExplosiveEnemy.js';
 import { LauncherEnemy } from '../entities/LauncherEnemy.js';
 import { Utils } from '../core/Utils.js';
-import { Chest } from '../entities/Chest.js';
 import * as THREE from 'three';
 
 export class WaveManager {
@@ -21,37 +20,10 @@ export class WaveManager {
         this.timeBetweenWaves = 3.0;
         this.waveTimer = 0;
         this.totalEnemiesInWave = 0;
-
-        // Controle do baú ativo
-        this.activeChest = null;
     }
 
     update(dt) {
-        // 1. Lógica do Baú (prioridade sobre a onda)
-        if (this.activeChest) {
-            this.activeChest.update(dt);
-
-            // Verifica a distância do player para o baú
-            const dist = this.player.position.distanceTo(this.activeChest.position);
-
-            // Se o player estiver perto (3 unidades) e o baú ainda estiver fechado
-            if (dist < 3.0 && !this.activeChest.isOpened) {
-                this.activeChest.open();
-
-                // Aguarda 1.5s para ver a animação e depois chama os upgrades
-                setTimeout(() => {
-                    if (this.activeChest) {
-                        this.scene.remove(this.activeChest.mesh);
-                        this.activeChest = null;
-                    }
-                    this.upgradeManager.showUpgrades();
-                }, 1500);
-            }
-            // Retornamos aqui para não processar lógica de onda enquanto lida com o baú
-            return;
-        }
-
-        // 2. Lógica da Onda
+        // Lógica da Onda
         if (this.waveInProgress) {
             // Update Progress Bar
             const enemiesLeft = this.enemies.length;
@@ -64,20 +36,38 @@ export class WaveManager {
 
             if (this.enemies.length === 0) {
                 this.waveInProgress = false;
-
-                // A cada 10 ondas -> Spawna o Baú
-                if (this.currentWave > 0 && this.currentWave % 10 === 0) {
-                    this.triggerChest();
-                } else {
-                    // Trigger Upgrade imediatamente se não for onda de baú
-                    this.upgradeManager.showUpgrades();
-                }
+                // Trigger Upgrades immediately explicitly if needed (or just wait for next wave timer?)
+                // The prompt implies "chance to drop weapon on death", so maybe wave completion 
+                // doesn't trigger upgrades anymore? No, drops are per enemy.
+                // But we still need wave progression.
+                // Revert to simple wave timer or maybe a "Wave Complete" text.
+                // Let's keep showing upgrades for now if that's the only way to heal/get stronger,
+                // OR disable it if the user wants purely loot drops.
+                // User said "backpack... drag drop", so maybe drops are the main way.
+                // I'll keep the Wave Complete pause but remove the Chest spawn.
             }
         } else {
             // Initial start or waiting for next wave
             if (this.currentWave === 0) {
                 this.waveTimer -= dt;
                 if (this.waveTimer <= 0) {
+                    this.startNextWave();
+                }
+            } else {
+                // Determine what to do between waves?
+                this.waveTimer -= dt; // reuse timer?
+                // Let's just auto-start next wave for now or wait 3s
+                if (this.waveTimer <= 0) {
+                    // Reset timer for next pause? 
+                    // To do: Add proper "Wave Complete" state
+                }
+            }
+
+            // Auto start logic fix:
+            if (!this.waveInProgress && this.enemies.length === 0) {
+                this.waveTimer -= dt;
+                if (this.waveTimer <= 0) {
+                    this.waveTimer = this.timeBetweenWaves;
                     this.startNextWave();
                 }
             }
@@ -122,20 +112,5 @@ export class WaveManager {
         }
 
         this.enemies.push(enemy);
-    }
-
-    triggerChest() {
-        // Spawn Chest in front of player
-        const spawnDist = 5.0;
-        const playerDir = new THREE.Vector3();
-        this.player.camera.getWorldDirection(playerDir);
-        playerDir.y = 0;
-        playerDir.normalize();
-
-        const spawnPos = this.player.position.clone().add(playerDir.multiplyScalar(spawnDist));
-        spawnPos.y = 0; // On floor
-
-        // Cria o baú e guarda na variável activeChest para o update() monitorar
-        this.activeChest = new Chest(this.scene, spawnPos);
     }
 }

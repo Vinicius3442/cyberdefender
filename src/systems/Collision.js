@@ -15,6 +15,19 @@ export class Collision {
         for (const proj of this.projectiles) {
             if (proj.shouldRemove) continue;
 
+            // 0. Floor Hit
+            if (proj.hitFloor) {
+                if (proj.isExplosive) {
+                    this.createExplosion(proj.mesh.position, proj.explosionRadius, proj.damage, true);
+                    proj.shouldRemove = true;
+                } else if (!proj.isStuck) {
+                    // Normal bullets disappear on floor hit
+                    proj.shouldRemove = true;
+                }
+                // If isStuck (Arrow), do nothing (it lingers)
+                continue;
+            }
+
             // BFG Area Damage (Tick based? Or just kill?)
             // Let's make BFG kill everything in radius every frame (OP but fun)
             if (proj.isBFG) {

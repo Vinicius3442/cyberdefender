@@ -38,6 +38,12 @@ export class Projectile {
     }
 
     update(dt) {
+        if (this.isStuck) {
+            this.lifeTime -= dt;
+            if (this.lifeTime <= 0) this.shouldRemove = true;
+            return;
+        }
+
         this.lifeTime -= dt;
         if (this.lifeTime <= 0) {
             this.shouldRemove = true;
@@ -46,11 +52,33 @@ export class Projectile {
         const moveStep = this.velocity.clone().multiplyScalar(dt);
         this.mesh.position.add(moveStep);
 
-        // BFG Effect: Damage everything nearby as it flies
+        // Floor Collision
+        if (this.mesh.position.y <= 0) {
+            this.mesh.position.y = 0;
+            this.hitFloor = true;
+
+            // Arrow Logic: Stick to floor
+            // We detect type by geometry? Or add a property?
+            // Let's assume if it's NOT explosive and NOT BFG, check if it looks like an arrow?
+            // Better: Player.js sets specific flags. 
+            // For now, let's look at the mesh structure or add a flag in Player.js
+            // Simplest: Check if it's NOT explosive and lifetime is not instant remove.
+            // Actually, I'll rely on Collision.js to handle the "Remove" logic for bullets.
+            // But for sticking, we stop velocity here.
+
+            // Hacky check for arrow: if it has children (group) it is likely the arrow or shotgun/etc.
+            // But checking Children is safer for the Arrow Group we made.
+            const isArrow = this.mesh.type === 'Group';
+
+            if (isArrow && !this.isExplosive) {
+                this.isStuck = true;
+                this.lifeTime = 5.0; // Stay for 5 seconds
+            }
+        }
+
+        // BFG Effect
         if (this.isBFG) {
-            // This needs access to enemies list, but Projectile doesn't have it.
-            // Logic must be in Collision.js or passed in.
-            // We'll handle BFG area damage in Collision.js
+            // (Handled in Collision)
         }
     }
 }

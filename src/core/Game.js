@@ -9,6 +9,7 @@ import { Chest } from '../entities/Chest.js';
 import { NetworkManager } from './NetworkManager.js';
 import { RemotePlayer } from '../entities/RemotePlayer.js';
 import { WeaponConfig } from './WeaponSystem.js';
+import { WeaponPickup } from '../entities/WeaponPickup.js';
 
 export class Game {
     constructor(mode = 'SP', mpParams = {}) {
@@ -77,17 +78,12 @@ export class Game {
         dirLight.shadow.camera.right = 20;
         this.scene.add(dirLight);
 
-        // Floor
-        const floorGeometry = new THREE.PlaneGeometry(10000, 10000);
-        const floorTexture = textureLoader.load('./assets/floor.png');
-        floorTexture.wrapS = THREE.RepeatWrapping;
-        floorTexture.wrapT = THREE.RepeatWrapping;
-        floorTexture.repeat.set(100, 100);
-
+        // Floor (Light Gray Grid)
+        const floorGeometry = new THREE.PlaneGeometry(1000, 1000); // Smaller reliable plane
         const floorMaterial = new THREE.MeshStandardMaterial({
-            map: floorTexture,
-            roughness: 0.8,
-            color: 0x888888 // Tint
+            color: 0xcccccc, // Light Gray
+            roughness: 0.9,
+            metalness: 0.1
         });
 
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -95,21 +91,24 @@ export class Game {
         floor.receiveShadow = true;
         this.scene.add(floor);
 
-        // Grid Helper
-        const gridHelper = new THREE.GridHelper(100, 100);
+        // Infinite Grid Visual
+        const gridHelper = new THREE.GridHelper(1000, 100, 0x555555, 0xbbbbbb);
         this.scene.add(gridHelper);
 
         // Input
         this.input = new Input();
         this.input.onPause = () => this.togglePause();
-        this.input.onInteract = () => this.checkInteraction();
+        this.input.onInteract = () => this.checkInteraction(); // Keep for future use (drops)
 
         // Player
         this.player = new Player(this.camera, this.input, this.scene, this.projectiles, this.playerSkinURL);
 
         // Systems
         this.particleSystem = new ParticleSystem(this.scene);
-        this.upgradeManager = new UpgradeManager(this);
+        this.upgradeManager = new UpgradeManager(this); // Keep for Drop UI? Or remove?
+        // User said "backpack" for weapons. UpgradeManager handled "Cards". 
+        // We probably need to refactor UpgradeManager into InventoryManager later.
+
         if (this.mode === 'SP') {
             this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
         }
@@ -198,6 +197,28 @@ export class Game {
                 weapon: this.player.getCurrentWeaponType()
             });
         };
+    }
+
+    togglePause() {
+        if (!this.mpGameParams.started && this.mode === 'MP') return; // Don't pause in lobby
+        if (!this.player) return;
+
+        this.isPaused = !this.isPaused;
+
+        const pauseMenu = document.getElementById('pause-menu');
+        if (this.isPaused) {
+            if (pauseMenu) pauseMenu.style.display = 'flex';
+            document.exitPointerLock();
+        } else {
+            if (pauseMenu) pauseMenu.style.display = 'none';
+            document.body.requestPointerLock();
+            this.clock.getDelta(); // Reset clock to avoid huge dt spike
+        }
+    }
+
+    spawnPickup(position, type = null) {
+        const pickup = new WeaponPickup(this.scene, position, type);
+        this.pickups.push(pickup);
     }
 
     startMatch() {
@@ -367,8 +388,22 @@ export class Game {
                     if (e.isDead) {
                         this.scene.remove(e.mesh);
                         this.enemies.splice(i, 1);
-                        // Maybe score update here
+                        this.player.score += 100;
+                        if (Math.random() < 0.4) { // 40% Drop Chance
+                            this.spawnPickup(e.mesh.position);
+                        }
                     }
+                }
+            }
+
+            // Update Pickups
+            for (let i = this.pickups.length - 1; i >= 0; i--) {
+                const p = this.pickups[i];
+                if (p.update(dt, this.player.position)) {
+                    // Picked up
+                    this.player.addWeapon(p.type);
+                    this.scene.remove(p.mesh);
+                    this.pickups.splice(i, 1);
                 }
             }
 
@@ -376,16 +411,6 @@ export class Game {
             if (this.waveManager) this.waveManager.update(dt);
             if (this.collision) this.collision.update();
             this.particleSystem.update(dt);
-
-            // Update Chests
-            for (let i = this.chests.length - 1; i >= 0; i--) {
-                const chest = this.chests[i];
-                chest.update(dt);
-                if (chest.shouldRemove) {
-                    this.scene.remove(chest.mesh);
-                    this.chests.splice(i, 1);
-                }
-            }
         }
 
         this.renderer.render(this.scene, this.camera);

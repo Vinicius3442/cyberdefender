@@ -122,13 +122,43 @@ export class Input {
             this.isLocked = true;
             const startScreen = document.getElementById('start-screen');
             if (startScreen) startScreen.style.display = 'none';
+            // Also hide pause menu if it was open? 
+            // Better handled by game logic, but we can ensure it.
+            const pauseMenu = document.getElementById('pause-menu');
+            // If we locked, we are playing.
+            // Note: Game.js togglePause handles state.
         } else {
             this.isLocked = false;
-            // If we are not paused, show start screen (unless game over)
-            // But wait, if we pause, we manually show start screen.
-            // If user presses ESC, we just unlock.
-            // Let's assume Game.js handles the UI for pause.
-            // Here we just ensure state is correct.
+            // If we unlocked, and we are NOT in the start screen, we should pause.
+            const startScreen = document.getElementById('start-screen');
+            const isMenuOpen = startScreen && startScreen.style.display !== 'none';
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const isGameOver = gameOverScreen && gameOverScreen.style.display !== 'none';
+
+            if (!isMenuOpen && !isGameOver) {
+                // We were playing, and got unlocked (user pressed ESC).
+                // Trigger Pause.
+                if (this.onPause) {
+                    // Check if already paused handled by Game logic?
+                    // Game.togglePause checks isPaused flag.
+                    // If we just unlocked, we want to SET pause to true.
+                    // We call onPause() which calls togglePause().
+                    // But wait, togglePause calls exitPointerLock. Loop?
+                    // Game.togglePause checks: if paused -> exitPointerLock.
+                    // Here: pointerUnlock -> onPause -> togglePause -> paused=true. 
+                    // Should be fine.
+
+                    // Small delay to ensure we don't conflict with click-to-lock logic?
+                    // No.
+
+                    // BUT: We need to know if the Game considers itself paused.
+                    // Input doesn't know game state.
+                    // We just fire the event. Game.js should handle "If already paused, do nothing" or "If unlocked, force pause".
+                    // Game.togglePause toggles. If we press ESC, we unlock.
+                    // If we call togglePause(), isPaused becomes true. UI shows. Perfect.
+                    this.onPause();
+                }
+            }
         }
     }
 }

@@ -29,12 +29,7 @@ export class Player {
         // Inventory
         this.inventory = [
             WeaponType.PISTOL,
-            WeaponType.SWORD,
-            WeaponType.SHOTGUN,
-            WeaponType.CROSSBOW,
-            WeaponType.AXE,
-            WeaponType.LMG,
-            WeaponType.LAUNCHER
+            WeaponType.SWORD
         ];
         this.currentSlot = 0;
         this.weaponState = {}; // Store ammo per weapon type
@@ -397,6 +392,22 @@ export class Player {
             } else if (type === WeaponType.LAUNCHER) {
                 projectile.isExplosive = true;
                 projectile.explosionRadius = config.radius;
+            } else if (type === WeaponType.CROSSBOW) {
+                // Arrow Visual
+                const arrowGroup = new THREE.Group();
+                const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), new THREE.MeshStandardMaterial({ color: 0x8b4513 }));
+                shaft.rotation.x = -Math.PI / 2;
+                arrowGroup.add(shaft);
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.05), new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+                tip.rotation.x = -Math.PI / 2;
+                tip.position.z = 0.2;
+                arrowGroup.add(tip);
+
+                // Replace default projectile mesh
+                projectile.mesh = arrowGroup;
+                projectile.mesh.position.copy(spawnPos);
+                // Rotate arrow to match direction
+                projectile.mesh.lookAt(spawnPos.clone().add(spreadDir));
             }
 
             this.scene.add(projectile.mesh);
@@ -458,16 +469,36 @@ export class Player {
     die() {
         this.isDead = true;
         document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('final-score').innerText = "SCORE: " + this.score;
         document.exitPointerLock();
+
+        // Submit Score to Leaderboard
+        if (window.submitScore) {
+            window.submitScore(this.score);
+        }
     }
 
     addWeapon(type) {
         if (!this.inventory.includes(type)) {
             this.inventory.push(type);
-            this.switchWeapon(this.inventory.length - 1);
+            // Auto switch? Maybe notify user.
+            const notif = document.createElement('div');
+            notif.innerText = 'ACQUIRED: ' + type;
+            notif.style.cssText = 'position:absolute; top:20%; left:50%; transform:translate(-50%,-50%); color:#0f0; font-size:30px; font-weight:bold; text-shadow:0 0 10px #0f0; animation: fadeOut 2s forwards;';
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 2000);
         } else {
-            this.weaponState[type].ammo = WeaponConfig[type].maxAmmo;
-            this.updateAmmoDisplay();
+            // Refill ammo
+            if (this.weaponState[type]) {
+                this.weaponState[type].ammo = WeaponConfig[type].maxAmmo;
+                this.updateAmmoDisplay();
+
+                const notif = document.createElement('div');
+                notif.innerText = 'AMMO REFILLED: ' + type;
+                notif.style.cssText = 'position:absolute; top:20%; left:50%; transform:translate(-50%,-50%); color:#ff0; font-size:20px; font-weight:bold; animation: fadeOut 2s forwards;';
+                document.body.appendChild(notif);
+                setTimeout(() => notif.remove(), 2000);
+            }
         }
     }
 }
