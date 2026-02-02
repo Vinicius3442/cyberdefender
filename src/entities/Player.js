@@ -29,7 +29,12 @@ export class Player {
         // Inventory
         this.inventory = [
             WeaponType.PISTOL,
-            WeaponType.SWORD
+            WeaponType.SWORD,
+            WeaponType.SHOTGUN,
+            WeaponType.CROSSBOW,
+            WeaponType.AXE,
+            WeaponType.LMG,
+            WeaponType.LAUNCHER
         ];
         this.currentSlot = 0;
         this.weaponState = {}; // Store ammo per weapon type

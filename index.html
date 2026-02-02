@@ -16,6 +16,7 @@
             }
         }
     </script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 
 <body>
@@ -25,9 +26,10 @@
         <div id="crosshair"></div>
         <div id="hud">
             <div class="hud-item">HP: <span id="hp-display">100</span></div>
-            <div class="hud-item">WAVE: <span id="wave-display">1</span></div>
+            <div class="hud-item" id="wave-info">WAVE: <span id="wave-display">1</span></div>
             <div class="hud-item">WEAPON: <span id="weapon-display">Pistol</span></div>
             <div class="hud-item" id="ammo-container">AMMO: <span id="ammo-display">∞</span></div>
+            <div class="hud-item" id="mp-info" style="display: none;">PLAYERS: <span id="player-count">1</span>/10</div>
         </div>
 
         <div id="wave-progress-container">
@@ -49,9 +51,60 @@
                     <input type="file" id="player-skin" accept="image/png">
                 </div>
 
+                <div class="input-group" id="mp-controls">
+                    <label>MULTIPLAYER (BATTLE ROYALE)</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button id="btn-host" class="menu-btn" style="flex: 1;">HOST</button>
+                        <button id="btn-join" class="menu-btn" style="flex: 1;">JOIN</button>
+                    </div>
+                    <!-- Custom Host ID -->
+                    <input type="text" id="host-id-input" placeholder="Optional: Custom Host ID"
+                        style="display: none; margin-bottom: 10px;">
+
+                    <div id="join-section" style="display: none; width: 100%;">
+                        <div id="room-list"
+                            style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.5); margin-bottom: 10px; border: 1px solid #444;">
+                            <p style="padding: 5px; color: #888;">Searching for rooms...</p>
+                        </div>
+                        <button id="btn-refresh-rooms" class="menu-btn secondary"
+                            style="font-size: 12px; margin-bottom: 5px;">REFRESH LIST</button>
+                        <input type="text" id="join-id" placeholder="Or Enter Host ID" style="width: 100%;">
+                    </div>
+
+                    <div id="server-status" style="font-size: 12px; color: #f00; margin-top: 5px;">Server: Disconnected
+                    </div>
+                </div>
+
                 <div class="button-group">
-                    <button id="btn-play" class="menu-btn primary">PLAY</button>
+                    <button id="btn-play" class="menu-btn primary">SINGLE PLAYER</button>
                     <button id="btn-config" class="menu-btn secondary">CONFIG</button>
+                </div>
+            </div>
+
+            <div id="lobby-screen" style="display: none; flex-direction: column; align-items: center; width: 100%;">
+                <h2 style="color: #0f0;">LOBBY</h2>
+                <div id="lobby-host-info" style="margin-bottom: 20px; text-align: center;">
+                    <p>ROOM ID (Share this):</p>
+                    <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
+                        <h3 id="lobby-room-id"
+                            style="color: #fff; user-select: text; background: #222; padding: 5px; border-radius: 4px;">
+                            Loading...</h3>
+                        <button id="btn-copy-id" class="menu-btn interactive"
+                            style="padding: 5px 10px; font-size: 14px;">COPY</button>
+                    </div>
+                </div>
+
+                <div
+                    style="width: 80%; background: rgba(0,0,0,0.5); padding: 10px; border: 1px solid #333; min-height: 100px;">
+                    <p>CONNECTED PLAYERS (<span id="lobby-count">1</span>/10):</p>
+                    <ul id="lobby-player-list" style="list-style: none; padding: 0; color: #aaa;">
+                        <li>You</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button id="btn-start-match" class="menu-btn primary" style="display: none;">START MATCH</button>
+                    <p id="lobby-msg" style="color: #ff0; display: none;">Waiting for Host to start...</p>
                 </div>
             </div>
 
@@ -61,7 +114,7 @@
         </div>
 
         <div id="game-over-screen" style="display: none;">
-            <h1>MISSION FAILED</h1>
+            <h1 id="game-over-title">MISSION FAILED</h1>
             <p id="final-score">Wave Reached: 1</p>
             <button id="btn-restart" class="menu-btn primary" onclick="location.reload()">RETRY</button>
         </div>

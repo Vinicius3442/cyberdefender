@@ -34,8 +34,15 @@ export class Input {
         const startScreen = document.getElementById('start-screen');
         if (startScreen) {
             startScreen.addEventListener('click', (e) => {
+                // Ignore clicks if we are in Lobby mode (checking if lobby-screen is visible)
+                const lobbyScreen = document.getElementById('lobby-screen');
+                if (lobbyScreen && lobbyScreen.style.display !== 'none') return;
+
                 // Ignore clicks on inputs/buttons
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('.interactive')) return;
+
+                // Only lock if we are actually playing or about to play?
+                // For now, just restricting it from lobby is enough.
                 document.body.requestPointerLock();
             });
         }

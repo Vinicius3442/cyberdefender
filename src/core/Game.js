@@ -6,9 +6,14 @@ import { Collision } from '../systems/Collision.js';
 import { UpgradeManager } from '../systems/UpgradeManager.js';
 import { ParticleSystem } from '../systems/ParticleSystem.js';
 import { Chest } from '../entities/Chest.js';
+import { NetworkManager } from './NetworkManager.js';
+import { RemotePlayer } from '../entities/RemotePlayer.js';
+import { WeaponConfig } from './WeaponSystem.js';
 
 export class Game {
-    constructor() {
+    constructor(mode = 'SP', mpParams = {}) {
+        this.mode = mode; // 'SP' (Single Player) or 'MP' (Multiplayer)
+        this.mpParams = mpParams; // { host: boolean, id: string, name: string, skin: string }
         this.scene = null;
         this.camera = null;
         this.renderer = null;
@@ -22,7 +27,13 @@ export class Game {
         this.projectiles = [];
         this.enemies = [];
         this.chests = [];
+        this.remotePlayers = {}; // id -> RemotePlayer
+        this.network = null;
         this.isPaused = false;
+        this.isInLobby = false; // New flag
+        this.mpGameParams = {
+            started: false
+        };
 
         this.init();
     }
@@ -67,11 +78,11 @@ export class Game {
         this.scene.add(dirLight);
 
         // Floor
-        const floorGeometry = new THREE.PlaneGeometry(100, 100);
+        const floorGeometry = new THREE.PlaneGeometry(10000, 10000);
         const floorTexture = textureLoader.load('./assets/floor.png');
         floorTexture.wrapS = THREE.RepeatWrapping;
         floorTexture.wrapT = THREE.RepeatWrapping;
-        floorTexture.repeat.set(10, 10);
+        floorTexture.repeat.set(100, 100);
 
         const floorMaterial = new THREE.MeshStandardMaterial({
             map: floorTexture,
@@ -99,7 +110,9 @@ export class Game {
         // Systems
         this.particleSystem = new ParticleSystem(this.scene);
         this.upgradeManager = new UpgradeManager(this);
-        this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
+        if (this.mode === 'SP') {
+            this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
+        }
         this.collision = new Collision(this.player, this.enemies, this.projectiles, this.particleSystem);
 
         // Pass particle system to player for slash effects
@@ -108,46 +121,176 @@ export class Game {
         // Events
         window.addEventListener('resize', () => this.onWindowResize(), false);
 
-        // Start Loop
-        this.animate();
-    }
+        // Setup MP
+        if (this.mode === 'MP') {
+            this.initMultiplayer();
+        }
 
-    togglePause() {
-        this.isPaused = !this.isPaused;
-        if (this.isPaused) {
-            document.exitPointerLock();
-            document.getElementById('start-screen').style.display = 'flex';
-            document.getElementById('start-screen').querySelector('h1').innerText = "PAUSED";
-            document.getElementById('start-screen').querySelector('p').innerText = "Press P or Click to Resume";
+        // Start Logic (If SP, start immediately. If MP, wait in lobby?)
+        if (this.mode === 'SP') {
+            // Request Pointer Lock immediately handled in main.js
+            this.animate();
         } else {
-            document.body.requestPointerLock();
-            document.getElementById('start-screen').style.display = 'none';
+            // MP starts in lobby state
+            this.isInLobby = true;
+            this.animate(); // Logic loop runs to handle network, but player disabled
         }
     }
 
-    onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+    initMultiplayer() {
+        // Unlock all weapons
+        const allWeapons = Object.keys(WeaponConfig);
+        this.player.inventory = allWeapons;
+        this.player.switchWeapon(0);
 
-    checkInteraction() {
-        if (this.chests.length === 0) return;
+        this.network = new NetworkManager(this);
 
-        const playerPos = this.player.position;
-        for (const chest of this.chests) {
-            if (chest.isOpened) continue;
-            if (playerPos.distanceTo(chest.position) < 3.0) {
-                chest.open();
-                this.waveManager.onChestOpened();
+        // Setup Callbacks
+        this.network.onPlayerJoin = (id, data) => this.onMPPlayerJoin(id, data);
+        this.network.onPlayerUpdate = (id, data) => this.onMPPlayerUpdate(id, data);
+        this.network.onPlayerAction = (id, data) => this.onMPPlayerAction(id, data);
+        this.network.onPlayerDisconnect = (id) => this.onMPPlayerDisconnect(id);
 
-                // Visuals
-                if (this.particleSystem) {
-                    this.particleSystem.createExplosion(chest.position, 0xFFD700, 30);
-                }
-                break; // Only open one at a time
+        // Error handling
+        this.network.onError = (err) => {
+            alert("Connection Error: " + (err.type || err));
+            if (err.type === 'unavailable-id') {
+                window.location.reload();
             }
+        };
+
+        // Client specific
+        this.network.onWorldUpdate = (data) => this.onMPWorldUpdate(data);
+        this.network.onEvent = (data) => this.onMPEvent(data); // Handle Start Match
+
+        // Initialize based on role
+        if (this.mpParams.host) {
+            this.network.hostGame(this.mpParams.id);
+            // UI handled in main.js via callbacks or events, 
+            // but for now Game.js handles logic. 
+            // We need to notify Main.js that ID is ready.
+            this.network.onReady = (id) => {
+                const ev = new CustomEvent('mp-host-ready', { detail: { id: id } });
+                window.dispatchEvent(ev);
+            };
+        } else {
+            this.network.joinGame(this.mpParams.hostId);
         }
+
+        // Update UI hooks
+        this.network.onConnectionListUpdate = (list) => {
+            const ev = new CustomEvent('mp-player-list', { detail: { players: list } });
+            window.dispatchEvent(ev);
+        };
+
+        // Override Input Attack to send network event
+        const originalAttack = this.player.attack.bind(this.player);
+        this.player.attack = () => {
+            originalAttack();
+            // Send attack event
+            // Logic handled inside Player but we might need to hook it better
+            // For now, let's just send a simple "I shot" event
+            if (this.player.attackCooldown > 0) return; // Debounce check matches player
+
+            this.network.sendClientAction('shoot', {
+                pos: this.player.camera.position,
+                dir: this.player.camera.getWorldDirection(new THREE.Vector3()),
+                weapon: this.player.getCurrentWeaponType()
+            });
+        };
+    }
+
+    startMatch() {
+        if (this.mode === 'MP' && this.mpParams.host) {
+            this.network.broadcastEvent('start_match', {});
+            this.beginGameplay();
+        }
+    }
+
+    beginGameplay() {
+        this.isInLobby = false;
+        this.mpGameParams.started = true;
+
+        document.getElementById('lobby-screen').style.display = 'none';
+        document.body.requestPointerLock();
+
+        document.getElementById('wave-info').style.display = 'none';
+        document.getElementById('wave-progress-container').style.display = 'none';
+        document.getElementById('mp-info').style.display = 'block';
+    }
+
+    onMPEvent(data) {
+        if (data.event === 'start_match') {
+            this.beginGameplay();
+        }
+    }
+
+    // --- MP Host Logic ---
+    onMPPlayerJoin(id, data) {
+        console.log("Player Joined:", id);
+        // Spawn Remote Player
+        const rp = new RemotePlayer(this.scene, id, data);
+        this.remotePlayers[id] = rp;
+        this.updatePlayerCount();
+
+        // Notify UI
+        if (this.network.isHost) {
+            // Broadcast updated list to everyone (or just send world state which includes active players)
+            // The Lobby UI needs names. WorldState currently sends minimal data.
+            // Let's add explicit lobby data sync? Or just rely on WorldState for now.
+            // For lobby, we need a separate "player list" broadcast provided by NetworkManager potentially.
+        }
+    }
+
+    onMPPlayerUpdate(id, data) {
+        if (!this.mpGameParams.started) return; // Ignore movement in lobby
+        if (this.remotePlayers[id]) {
+            this.remotePlayers[id].updateState(data);
+        }
+    }
+
+    onMPPlayerAction(id, data) {
+        // Handle shots from others
+        console.log("Player Action:", id, data);
+    }
+
+    onMPPlayerDisconnect(id) {
+        if (this.remotePlayers[id]) {
+            this.remotePlayers[id].remove();
+            delete this.remotePlayers[id];
+        }
+        this.updatePlayerCount();
+    }
+
+    updatePlayerCount() {
+        const count = Object.keys(this.remotePlayers).length + 1; // +1 for self
+        document.getElementById('player-count').innerText = count;
+    }
+
+    // --- MP Client Logic ---
+    onMPWorldUpdate(playersData) {
+        // clients receive list of all players { id: { pos, rot, skin... } }
+        Object.keys(playersData).forEach(id => {
+            if (id === this.network.peer.id) return; // Ignore self
+
+            if (!this.remotePlayers[id]) {
+                // New player discovered via world state
+                this.remotePlayers[id] = new RemotePlayer(this.scene, id, { skin: playersData[id].skin });
+            }
+            this.remotePlayers[id].updateState(playersData[id]);
+        });
+
+        // Cleanup logged out players
+        Object.keys(this.remotePlayers).forEach(id => {
+            if (!playersData[id]) {
+                this.remotePlayers[id].remove();
+                delete this.remotePlayers[id];
+            }
+        });
+
+        // Update count
+        const count = Object.keys(playersData).length;
+        document.getElementById('player-count').innerText = count;
     }
 
     animate() {
@@ -155,12 +298,56 @@ export class Game {
 
         if (this.isPaused) return;
 
+        // If in lobby, just render scene (maybe rotating camera?) without updates
+        if (this.isInLobby) {
+            this.renderer.render(this.scene, this.camera);
+            if (this.network) {
+                // Keep network alive?
+            }
+            return;
+        }
+
         const dt = this.clock.getDelta();
 
         // Allow updates if locked OR if we want to debug (optional, but let's stick to lock for now)
-        if (this.input.isLocked) {
+        if (this.input.isLocked || this.mode === 'MP') { // Allow update in MP even if unlocked momentarily? No, strict.
             // Update Entities
             this.player.update(dt);
+
+            // MP Sync
+            if (this.mode === 'MP' && this.network) {
+                // 1. Update Remote Players
+                Object.values(this.remotePlayers).forEach(rp => rp.update(dt));
+
+                // 2. Send My State
+                // Optimize: Send only at intervals (e.g. 20Hz)
+                if (this.network.peerId) { // Wait for ID
+                    const myState = {
+                        pos: this.player.position,
+                        rot: this.player.camera.quaternion,
+                        skin: this.player.skinURL
+                    };
+
+                    if (this.network.isHost) {
+                        // Host loop: Compile state and broadcast
+                        const worldState = {};
+                        // Add self
+                        worldState[this.network.peerId] = myState;
+                        // Add others (known from their updates)
+                        Object.keys(this.remotePlayers).forEach(id => {
+                            worldState[id] = {
+                                pos: this.remotePlayers[id].targetPosition,
+                                rot: this.remotePlayers[id].targetRotation,
+                                skin: this.remotePlayers[id].skin // store skin somewhere?
+                            };
+                        });
+                        this.network.broadcastWorldState(worldState);
+                    } else {
+                        // Client loop: Send to host
+                        this.network.sendClientUpdate(myState);
+                    }
+                }
+            }
 
             // Update Projectiles
             for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -172,20 +359,22 @@ export class Game {
                 }
             }
 
-            // Update Enemies
-            for (let i = this.enemies.length - 1; i >= 0; i--) {
-                const e = this.enemies[i];
-                e.update(dt, this.player.position);
-                if (e.isDead) {
-                    this.scene.remove(e.mesh);
-                    this.enemies.splice(i, 1);
-                    // Maybe score update here
+            // Update Enemies (Only in SP)
+            if (this.mode === 'SP') {
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    e.update(dt, this.player.position);
+                    if (e.isDead) {
+                        this.scene.remove(e.mesh);
+                        this.enemies.splice(i, 1);
+                        // Maybe score update here
+                    }
                 }
             }
 
             // Update Systems
-            this.waveManager.update(dt);
-            this.collision.update();
+            if (this.waveManager) this.waveManager.update(dt);
+            if (this.collision) this.collision.update();
             this.particleSystem.update(dt);
 
             // Update Chests
@@ -200,5 +389,11 @@ export class Game {
         }
 
         this.renderer.render(this.scene, this.camera);
+    }
+
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 }
