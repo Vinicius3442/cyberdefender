@@ -109,7 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const protocol = window.location.protocol;
         const host = window.location.hostname;
-        const port = 8000;
+        const port = 3001;
         const path = '/myapp/peerjs/peers';
 
         fetch(`${protocol}//${host}:${port}${path}`)

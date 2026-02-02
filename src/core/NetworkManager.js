@@ -25,7 +25,7 @@ export class NetworkManager {
 
         const peerConfig = {
             host: window.location.hostname, // Connect to the server that served the page
-            port: 8000,
+            port: 3001,
             path: '/myapp',
             debug: 2,
             config: {
@@ -85,7 +85,8 @@ export class NetworkManager {
         // PeerJS IDs are case sensitive? Yes.
 
         this.conn = this.peer.connect(hostId, {
-            reliable: true
+            reliable: true,
+            serialization: 'json' // Avoids BinaryPack/eval usage
         });
 
         this.conn.on('open', () => {
