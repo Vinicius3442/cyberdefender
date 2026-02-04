@@ -10,7 +10,8 @@ export class Collision {
         this.particleSystem = particleSystem;
     }
 
-    update() {
+    update(dt) {
+        this.dt = dt;
         // 1. Projectiles vs Enemies & Player
         for (const proj of this.projectiles) {
             if (proj.shouldRemove) continue;
@@ -42,38 +43,61 @@ export class Collision {
                 continue;
             }
 
-            const projBox = new THREE.Box3().setFromObject(proj.mesh);
+            // Sub-stepping for High Velocity Detection
+            const steps = 4; // Check 4 times per frame
+            const stepDt = (this.dt || 0.016) / steps;
+            
+            for (let s = 0; s < steps; s++) {
+                if (proj.shouldRemove) break;
 
-            if (proj.isPlayerProjectile) {
-                // Check vs Enemies
-                for (const enemy of this.enemies) {
-                    if (enemy.isDead) continue;
-                    const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
+                // Move manually for detection (actual movement happens in Projectile.update, this is predictive checking)
+                // Wait, Projectile.update ALREADY moved it. 
+                // We should check along the path from Previous to Current? 
+                // Or just move it here? No, Projectile.js handles movement.
+                // If Projectile.js moved it 20 units, we are checking AFTER the jump.
+                // Correct approach with standardized Projectile system:
+                // Let Collision system handle movement? No.
+                // Let's assume linear interpolation from (Current - Velocity*dt) to Current.
+                
+                const factor = (s + 1) / steps;
+                const checkPos = proj.mesh.position.clone().sub(proj.velocity.clone().multiplyScalar(this.dt || 0.016).multiplyScalar(1 - factor));
+                
+                // Temp check box at this interpolated position
+                const projBox = new THREE.Box3().setFromCenterAndSize(
+                    checkPos,
+                    new THREE.Vector3(0.2, 0.2, 0.2) // Small box for bullet
+                );
 
-                    if (Utils.checkCollision(projBox, enemyBox)) {
+                if (proj.isPlayerProjectile) {
+                    for (const enemy of this.enemies) {
+                        if (enemy.isDead) continue;
+                        const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
+
+                        if (Utils.checkCollision(projBox, enemyBox)) {
+                            if (proj.isExplosive) {
+                                this.createExplosion(checkPos, proj.explosionRadius, proj.damage, false);
+                            } else {
+                                enemy.takeDamage(proj.damage);
+                            }
+                            proj.shouldRemove = true;
+                            break; // Stop steps
+                        }
+                    }
+                } else {
+                    const playerBox = new THREE.Box3().setFromCenterAndSize(
+                        this.player.position,
+                        new THREE.Vector3(0.5, 1.8, 0.5)
+                    );
+
+                    if (Utils.checkCollision(projBox, playerBox)) {
                         if (proj.isExplosive) {
-                            this.createExplosion(proj.mesh.position, proj.explosionRadius, proj.damage, false);
+                            this.createExplosion(checkPos, proj.explosionRadius, proj.damage, true);
                         } else {
-                            enemy.takeDamage(proj.damage);
+                            this.player.takeDamage(proj.damage);
                         }
                         proj.shouldRemove = true;
                         break;
                     }
-                }
-            } else {
-                // Check vs Player
-                const playerBox = new THREE.Box3().setFromCenterAndSize(
-                    this.player.position,
-                    new THREE.Vector3(0.5, 1.8, 0.5)
-                );
-
-                if (Utils.checkCollision(projBox, playerBox)) {
-                    if (proj.isExplosive) {
-                        this.createExplosion(proj.mesh.position, proj.explosionRadius, proj.damage, true);
-                    } else {
-                        this.player.takeDamage(proj.damage);
-                    }
-                    proj.shouldRemove = true;
                 }
             }
         }

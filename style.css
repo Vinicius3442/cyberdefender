@@ -90,7 +90,14 @@ body {
     flex-direction: column;
     /* Stacked vertical info */
     gap: 5px;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    /* Stacked vertical info */
+    gap: 5px;
     align-items: flex-start;
+    pointer-events: none; /* Ensure clicks pass through */
 }
 
 .hud-item {
@@ -115,6 +122,55 @@ body {
 
 #ammo-display {
     color: #fe0;
+}
+
+/* Radar */
+#radar {
+    position: absolute;
+    bottom: 20px !important;
+    right: 20px !important;
+    top: auto !important;
+    left: auto !important;
+    width: 150px;
+    height: 150px;
+    background: rgba(0, 20, 0, 0.5);
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 0 10px var(--primary-color);
+}
+
+#radar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 140px;
+    height: 140px;
+    border: 1px dashed rgba(0, 255, 0, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+#radar-player {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    background: #0f0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 5px #0f0;
+}
+
+.radar-blip {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #f00;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
 }
 
 /* Progress Bar as a thin line at top */
@@ -284,10 +340,22 @@ body {
     color: var(--accent-color);
 }
 
+
 /* Game Over */
 #game-over-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.95);
     color: #f00;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    z-index: 100;
 }
 
 #game-over-screen h1 {
@@ -295,4 +363,401 @@ body {
     font-size: 80px;
     border: 4px solid #f00;
     padding: 20px;
+    animation: pulseBorder 1.5s infinite;
+}
+
+.skull-container {
+    display: flex;
+    gap: 20px;
+}
+
+.skull {
+    font-size: 60px;
+    animation: shake 2s infinite ease-in-out;
+}
+
+@keyframes pulseBorder {
+    0% { border-color: #f00; box-shadow: 0 0 10px #f00; }
+    50% { border-color: #500; box-shadow: 0 0 0px #f00; }
+    100% { border-color: #f00; box-shadow: 0 0 10px #f00; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Hotbar */
+#hotbar-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border: 1px solid #444;
+    border-radius: 4px;
+}
+
+.hotbar-slot {
+    width: 60px;
+    height: 60px;
+    background: rgba(20, 30, 20, 0.8);
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    position: relative;
+    transition: 0.2s;
+}
+
+.hotbar-slot.active {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(125, 163, 94, 0.5);
+    background: rgba(125, 163, 94, 0.1);
+    transform: scale(1.1);
+    z-index: 10;
+}
+
+.hotbar-key {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 10px;
+    color: #888;
+}
+
+/* Inventory Menu (Tactical Redesign) */
+#inventory-menu {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 900px;
+    height: 600px;
+    background: rgba(10, 12, 10, 0.95);
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 50px rgba(0, 0, 0, 0.8);
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    color: #ddd;
+    z-index: 50;
+    font-family: var(--font-ui);
+    pointer-events: auto;
+}
+
+#inventory-left {
+    flex: 2;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    border-right: 2px solid #333;
+}
+
+#inventory-right {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+}
+
+#inventory-menu h2 {
+    font-family: var(--font-main);
+    color: var(--primary-color);
+    font-size: 32px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 15px;
+}
+
+#inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 wide */
+    grid-gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* Tactical Slot */
+.inv-slot {
+    width: 60px;
+    height: 60px;
+    background: #111;
+    border: 1px solid #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: 0.2s;
+}
+
+.inv-slot:hover {
+    border-color: var(--accent-color);
+    background: #1a1a1a;
+}
+
+.inv-slot.active {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 10px var(--primary-color);
+}
+
+.inv-icon {
+    font-size: 24px;
+    pointer-events: none;
+}
+
+.inv-count {
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    font-size: 10px;
+    color: #aaa;
+}
+
+/* Player Preview */
+#player-preview-container {
+    width: 200px;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: inset 0 0 20px #000;
+}
+
+#player-preview-container img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#inventory-info {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border: 1px solid #333;
+    width: 100%;
+    margin-top: auto; /* Push to bottom */
+}
+
+#inv-item-name {
+    font-family: var(--font-main);
+    font-size: 20px;
+    color: var(--accent-color);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+#inv-item-desc {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+}
+
+/* Upgrade Screen (Character Sheet) */
+#upgrade-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 15, 10, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 50px;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+#upgrade-container {
+    display: flex;
+    width: 800px;
+    height: 500px;
+    border: 2px solid var(--primary-color);
+    background: #000;
+    box-shadow: 0 0 30px rgba(0, 50, 0, 0.5);
+}
+
+#upgrade-character-view {
+    flex: 1;
+    border-right: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: #0a0a0a;
+}
+
+#upgrade-char-img-container {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed #333;
+    margin-top: 20px;
+}
+
+#upgrade-char-img-container img {
+    max-width: 100%;
+    max-height: 300px;
+    filter: drop-shadow(0 0 10px #000);
+}
+
+#upgrade-stats-view {
+    flex: 1.5;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+#upgrade-options {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+    overflow-y: auto;
+}
+
+.upgrade-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #111;
+    padding: 10px 15px;
+    border: 1px solid #333;
+    transition: 0.2s;
+}
+
+.upgrade-row:hover {
+    border-color: var(--primary-color);
+    background: #151515;
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-label {
+    color: #888;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    color: #fff;
+    font-size: 18px;
+    font-family: var(--font-main);
+}
+
+.upgrade-btn {
+    background: #222;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    padding: 5px 15px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+.upgrade-btn:hover {
+    background: var(--primary-color);
+    color: #000;
+}
+
+/* --- Phase 3: Tactical Visor & Shutdown --- */
+
+#visor-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    box-shadow: inset 0 0 100px rgba(0, 50, 255, 0.2);
+    opacity: 0.6;
+    mix-blend-mode: overlay;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.1),
+            rgba(0, 0, 0, 0.1) 1px,
+            transparent 1px,
+            transparent 2px
+        );
+}
+
+.visor-corner {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border: 2px solid rgba(0, 255, 255, 0.5);
+}
+
+.visor-corner.top-left { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+.visor-corner.top-right { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+.visor-corner.bottom-left { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+.visor-corner.bottom-right { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+.scanline {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background-size: 100% 4px;
+    animation: scrollScan 10s linear infinite;
+    opacity: 0.1;
+}
+
+@keyframes scrollScan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+}
+
+/* Shutdown Screen */
+#shutdown-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0000aa; /* BSODish Blue or just Black */
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 50px;
+}
+
+.terminal-content {
+    font-size: 24px;
+    line-height: 1.5;
+    text-shadow: 0 0 5px #fff;
+}
+
+.cursor {
+    display: inline-block;
+    width: 10px;
+    height: 20px;
+    background: #fff;
+    animation: blink 0.5s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
 }

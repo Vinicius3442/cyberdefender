@@ -1,31 +1,52 @@
 import * as THREE from 'three';
 import { WeaponType } from '../core/WeaponSystem.js';
+import { WeaponFactory } from '../core/WeaponFactory.js';
 
 export class WeaponPickup {
-    constructor(scene, position, type) {
-        this.type = type || this.getRandomWeapon();
+    constructor(scene, position, type = 'RANDOM') {
         this.scene = scene;
-        this.shouldRemove = false;
-        this.radius = 1.0;
+        this.position = position.clone();
+        this.shouldRemove = false; // Keep existing property
 
-        // Visual
-        this.mesh = new THREE.Group();
-        this.mesh.position.copy(position);
-        this.mesh.position.y = 1.0; // Float
+        // Decide type if RANDOM
+        if (type === 'RANDOM' || !type) {
+             const rand = Math.random();
+             if (rand < 0.7) {
+                 this.type = 'AMMO'; // 70% chance ammo
+             } else {
+                 // 30% Weapon
+                 const keys = Object.values(WeaponType);
+                 this.type = keys[Math.floor(Math.random() * keys.length)];
+             }
+        } else {
+            this.type = type;
+        }
 
-        // Box visual
-        const box = new THREE.Mesh(
-            new THREE.BoxGeometry(0.5, 0.5, 0.5),
-            new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4400, emissiveIntensity: 0.5 })
-        );
-        this.mesh.add(box);
-
-        // Text Label (Canvas) would be nice, but simple color/shape for now.
-        // Or a floating light
-        const light = new THREE.PointLight(0xffaa00, 1, 3);
-        this.mesh.add(light);
-
+        this.mesh = this._createMesh();
+        this.mesh.position.copy(this.position);
         this.scene.add(this.mesh);
+
+        this.yOffset = 0; // New property for bobbing
+        this.radius = 2.0; // Fix: Define pickup radius
+    }
+
+    _createMesh() {
+        let mesh;
+
+        if (this.type === 'AMMO') {
+            mesh = WeaponFactory.createAmmoMesh();
+        } else {
+            // Weapon Model
+            mesh = WeaponFactory.createWeaponMesh(this.type);
+            // Center it inside group? It's already group.
+        }
+
+        // Add bobbing light
+        const light = new THREE.PointLight(this.type === 'AMMO' ? 0x00ff00 : 0xffff00, 1, 3);
+        light.position.y = 0.5;
+        mesh.add(light);
+        
+        return mesh;
     }
 
     getRandomWeapon() {

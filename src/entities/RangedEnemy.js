@@ -6,12 +6,41 @@ export class RangedEnemy extends Enemy {
     constructor(scene, position, projectiles) {
         super(scene, position);
         this.projectiles = projectiles;
-        this.mesh.material.color.setHex(0x0000ff); // Blue
-        this.hp = 30;
-        this.speed = 2.5;
-        this.attackRange = 15;
-        this.shootCooldown = 0;
-        this.shootRate = 2.0; // Seconds between shots
+        this.hp = 30; // Normal
+        this.speed = 3.5;
+        this.attackRange = 25; // Increase range slightly
+        this.attackCooldown = 1.5; // Faster shooting (was 2.0)
+        this.attackTimer = 0;
+        this.lastAttackTime = 0;
+    }
+
+    _createMesh() {
+        // Standard Droid
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+
+        // Head
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.2), mat);
+        head.position.y = 1.3;
+        group.add(head);
+
+        // Torso
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.1, 0.6), mat);
+        torso.position.y = 0.9;
+        group.add(torso);
+
+        // Eye Visor
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+        visor.position.set(0, 1.3, 0.1);
+        group.add(visor);
+
+        // Blaster Arm
+        const blaster = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+        blaster.position.set(0.3, 1.0, 0.2);
+        group.add(blaster);
+
+        group.scale.set(1.3, 1.3, 1.3);
+        return group;
     }
 
     update(dt, playerPosition) {
@@ -31,10 +60,10 @@ export class RangedEnemy extends Enemy {
             this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
         } else {
             // Shoot
-            this.shootCooldown -= dt;
-            if (this.shootCooldown <= 0) {
+            this.attackTimer -= dt;
+            if (this.attackTimer <= 0) {
                 this.shoot(playerPosition);
-                this.shootCooldown = this.shootRate;
+                this.attackTimer = this.attackCooldown;
             }
         }
     }

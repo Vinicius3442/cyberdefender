@@ -18,6 +18,7 @@ export class Input {
         this.onPause = null;
         this.onZoom = null;
         this.onInteract = null;
+        this.onInventory = null;
 
         this._init();
     }
@@ -61,6 +62,11 @@ export class Input {
                 break;
             case 'KeyR': if (this.onReload) this.onReload(); break;
             case 'KeyP': if (this.onPause) this.onPause(); break;
+            case 'KeyI': 
+            case 'Tab':
+                if (e.code === 'Tab') e.preventDefault(); // Prevent focus switch
+                if (this.onInventory) this.onInventory(); 
+                break;
             case 'Digit1': if (this.onSwitchWeapon) this.onSwitchWeapon(0); break;
             case 'Digit2': if (this.onSwitchWeapon) this.onSwitchWeapon(1); break;
             case 'Digit3': if (this.onSwitchWeapon) this.onSwitchWeapon(2); break;
@@ -135,7 +141,12 @@ export class Input {
             const gameOverScreen = document.getElementById('game-over-screen');
             const isGameOver = gameOverScreen && gameOverScreen.style.display !== 'none';
 
-            if (!isMenuOpen && !isGameOver) {
+            const invMenu = document.getElementById('inventory-menu');
+            const upgradeScreen = document.getElementById('upgrade-screen');
+            const isInvOpen = invMenu && invMenu.style.display !== 'none';
+            const isUpgradeOpen = upgradeScreen && upgradeScreen.style.display !== 'none';
+
+            if (!isMenuOpen && !isGameOver && !isInvOpen && !isUpgradeOpen) {
                 // We were playing, and got unlocked (user pressed ESC).
                 // Trigger Pause.
                 if (this.onPause) {

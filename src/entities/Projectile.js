@@ -15,26 +15,67 @@ export class Projectile {
         this.damage = 10;
         this.radius = 0.1;
 
-        // Special Types
+        // Special Types (Default False)
         this.isBFG = false;
         this.isExplosive = false;
         this.explosionRadius = 0;
+        this.isPlasma = false; 
+        this.spinRate = new THREE.Vector3();
 
-        // Mesh
+        // Mesh Generation (Default)
         let geometry = Projectile.geometry;
         let material = isPlayerProjectile ? Projectile.matPlayer : Projectile.matEnemy;
-
-        // We defer mesh creation if it's special, or we handle it after instantiation?
-        // The Player.js sets properties AFTER creation. This is tricky.
-        // Let's create a default mesh, and if Player.js changes it, we need to handle that.
-        // Actually, Player.js sets properties and REPLACES geometry. That's bad.
-        // Let's just use the default for now, and let Player.js do its thing but warn or fix Player.js later.
-        // For now, let's just reuse the basic ones.
-
-        this.mesh = new THREE.Mesh(geometry, material);
+        
+        // This mesh might be replaced by specialized logic in Player.js or overwritten here if we detect type in future refactor.
+        // Currently Player.js overrides this for BFG/Launcher. 
+        // We will enhance the DEFAULT mesh to be a glowing tracer for standard bullets.
+        
+        if (!this.mesh) {
+             // Elongated tracer for standard bullets
+             if (!this.isBFG && !this.isExplosive) {
+                 const traGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6);
+                 traGeo.rotateX(Math.PI / 2);
+                 material = new THREE.MeshBasicMaterial({ color: isPlayerProjectile ? 0xffff00 : 0xff0000 });
+                 this.mesh = new THREE.Mesh(traGeo, material);
+                 this.mesh.lookAt(this.mesh.position.clone().add(direction));
+             } else {
+                 this.mesh = new THREE.Mesh(geometry, material);
+             }
+        }
+        
         this.mesh.position.copy(position);
-
         this.lifeTime = 2.0;
+    }
+
+    // Static Helpers for Personality Models (Called by Player.js)
+    static createMissile() {
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8), new THREE.MeshStandardMaterial({color: 0x333333}));
+        body.rotation.x = Math.PI/2;
+        group.add(body);
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.1, 16), new THREE.MeshStandardMaterial({color: 0xff0000}));
+        nose.rotation.x = Math.PI/2;
+        nose.position.z = 0.25;
+        group.add(nose);
+        // Fins
+        const finGeo = new THREE.BoxGeometry(0.2, 0.2, 0.01);
+        const fins = new THREE.Mesh(finGeo, new THREE.MeshStandardMaterial({color: 0x555555}));
+        fins.position.z = -0.15;
+        group.add(fins);
+        const fins2 = fins.clone();
+        fins2.rotation.z = Math.PI/2;
+        group.add(fins2);
+        return group;
+    }
+
+    static createPlasma() {
+        const geo = new THREE.SphereGeometry(0.3, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8 });
+        const mesh = new THREE.Mesh(geo, mat);
+        // Inner core
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        mesh.add(core);
+        return mesh;
     }
 
     update(dt) {
@@ -78,7 +119,17 @@ export class Projectile {
 
         // BFG Effect
         if (this.isBFG) {
-            // (Handled in Collision)
+            // Pulse
+            const scale = 1.0 + Math.sin(this.lifeTime * 10) * 0.2;
+            this.mesh.scale.set(scale, scale, scale);
+            this.mesh.rotation.z += 5 * dt;
+        }
+        
+        // Spin (if any)
+        if (this.spinRate) {
+            this.mesh.rotation.x += this.spinRate.x * dt;
+            this.mesh.rotation.y += this.spinRate.y * dt;
+            this.mesh.rotation.z += this.spinRate.z * dt;
         }
     }
 }

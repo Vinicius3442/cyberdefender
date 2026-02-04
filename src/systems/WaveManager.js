@@ -36,15 +36,7 @@ export class WaveManager {
 
             if (this.enemies.length === 0) {
                 this.waveInProgress = false;
-                // Trigger Upgrades immediately explicitly if needed (or just wait for next wave timer?)
-                // The prompt implies "chance to drop weapon on death", so maybe wave completion 
-                // doesn't trigger upgrades anymore? No, drops are per enemy.
-                // But we still need wave progression.
-                // Revert to simple wave timer or maybe a "Wave Complete" text.
-                // Let's keep showing upgrades for now if that's the only way to heal/get stronger,
-                // OR disable it if the user wants purely loot drops.
-                // User said "backpack... drag drop", so maybe drops are the main way.
-                // I'll keep the Wave Complete pause but remove the Chest spawn.
+                this.game.showUpgradeScreen();
             }
         } else {
             // Initial start or waiting for next wave
@@ -90,20 +82,24 @@ export class WaveManager {
 
     spawnEnemy() {
         const spawnPos2D = Utils.getRandomSpawnPosition(40, 15); // Increased radius
-        const spawnPos = { x: spawnPos2D.x, y: 0, z: spawnPos2D.z };
+        const spawnPos = { 
+            x: this.player.position.x + spawnPos2D.x, 
+            y: 0, 
+            z: this.player.position.z + spawnPos2D.z 
+        };
 
         // Random Enemy Type based on weights
         const rand = Math.random();
         let enemy;
 
         // Simple weight system
-        if (rand < 0.4) {
+        if (rand < 0.3) {
             enemy = new MeleeEnemy(this.scene, spawnPos);
-        } else if (rand < 0.6) {
+        } else if (rand < 0.5) {
             enemy = new RangedEnemy(this.scene, spawnPos, this.player.projectiles);
-        } else if (rand < 0.7) {
+        } else if (rand < 0.6) {
             enemy = new TankEnemy(this.scene, spawnPos);
-        } else if (rand < 0.8) {
+        } else if (rand < 0.8) { // 20% Explosive
             enemy = new ExplosiveEnemy(this.scene, spawnPos);
         } else if (rand < 0.9) {
             enemy = new SniperEnemy(this.scene, spawnPos, this.player.projectiles);

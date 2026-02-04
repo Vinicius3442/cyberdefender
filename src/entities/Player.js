@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Projectile } from './Projectile.js';
 import { Utils } from '../core/Utils.js';
 import { WeaponType, WeaponConfig } from '../core/WeaponSystem.js';
+import { WeaponFactory } from '../core/WeaponFactory.js';
 
 export class Player {
     constructor(camera, input, scene, projectiles, skinURL) {
@@ -22,27 +23,38 @@ export class Player {
         this.gravity = 20.0;
         this.canJump = false;
 
+        this.currentSlot = 0;
+        this.weaponState = {}; // Store ammo per weapon type
+        
+        // Recoil & Shake
+        this.recoilRecovery = 0;
+        this.shakeTime = 0;
+        this.shakeIntensity = 0;
+        
+        // Load Skin
+        this._loadSkin(skinURL);
         this.hp = 100;
         this.maxHp = 100;
+        this.score = 0; // Initialize Score
         this.isDead = false;
 
-        // Inventory
-        this.inventory = [
-            WeaponType.PISTOL,
-            WeaponType.SWORD
-        ];
+        // Fixed Inventory (9 Slots)
+        this.inventory = new Array(9).fill(null);
+        this.inventory[0] = WeaponType.PISTOL;
+        this.inventory[1] = WeaponType.SWORD;
+        
         this.currentSlot = 0;
         this.weaponState = {}; // Store ammo per weapon type
 
         // Initialize Ammo
         Object.values(WeaponType).forEach(type => {
+            const cfg = WeaponConfig[type];
             this.weaponState[type] = {
-                ammo: WeaponConfig[type].ammo,
-                maxAmmo: WeaponConfig[type].maxAmmo
+                mag: cfg.magSize,
+                reserve: cfg.maxReserve,
+                maxReserve: cfg.maxReserve // Fix: Track max limit for refills
             };
         });
-
-        // Attack state
         this.isAttacking = false;
         this.attackCooldown = 0;
         this.isScoped = false;
@@ -73,130 +85,54 @@ export class Player {
         this.switchWeapon(0);
     }
 
+    update(dt, isMoving) {
+        // Update Weapon Position (Bobbing)
+        this._updateWeaponModel(dt, isMoving);
+        
+        // Recoil Recovery
+        if (this.recoilRecovery > 0) {
+            const recovery = 2.0 * dt; // Speed of return
+            this.camera.rotation.x -= Math.min(recovery, this.recoilRecovery);
+            this.recoilRecovery = Math.max(0, this.recoilRecovery - recovery);
+        }
+        
+        // Screen Shake
+        if (this.shakeTime > 0) {
+            this.shakeTime -= dt;
+            const rx = (Math.random() - 0.5) * this.shakeIntensity;
+            const ry = (Math.random() - 0.5) * this.shakeIntensity;
+            this.camera.position.add(new THREE.Vector3(rx, ry, 0)); // Don't shake Z (depth) too much
+        }
+    }
+
+    _loadSkin(url) {
+        // Stashed for later use (e.g. arm meshes)
+        if (url) console.log("Skin loaded for local player:", url);
+    }
+
+    _updateWeaponModel(dt, isMoving) {
+        if (!this.weaponContainer) return;
+        
+        // Bobbing Logic
+        if (!this.bobTimer) this.bobTimer = 0;
+        
+        if (isMoving) {
+            this.bobTimer += dt * 10;
+            this.weaponContainer.position.y = -0.3 + Math.sin(this.bobTimer) * 0.01;
+            this.weaponContainer.position.x = 0.3 + Math.cos(this.bobTimer * 0.5) * 0.01;
+        } else {
+            this.bobTimer = 0;
+            // Return to rest
+            this.weaponContainer.position.y = THREE.MathUtils.lerp(this.weaponContainer.position.y, -0.3, dt * 5);
+            this.weaponContainer.position.x = THREE.MathUtils.lerp(this.weaponContainer.position.x, 0.3, dt * 5);
+        }
+    }
+
     _createWeaponModels() {
-        const matBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
-        const matGrey = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.3 });
-        const matWood = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.8 });
-        const matGreen = new THREE.MeshStandardMaterial({ color: 0x2e4a2e, roughness: 0.6 });
-        const matMetal = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
-
-        // Helper
-        const addBox = (parent, w, h, d, x, y, z, mat) => {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            mesh.position.set(x, y, z);
-            parent.add(mesh);
-            return mesh;
-        };
-
-        // --- Pistol ---
-        const pistol = new THREE.Group();
-        addBox(pistol, 0.05, 0.12, 0.08, 0, -0.06, 0.05, matBlack).rotation.x = -0.1;
-        addBox(pistol, 0.06, 0.06, 0.25, 0, 0.02, -0.05, matGrey);
-        this.weaponModels[WeaponType.PISTOL] = pistol;
-
-        // --- Shotgun ---
-        const shotgun = new THREE.Group();
-        addBox(shotgun, 0.06, 0.12, 0.1, 0, -0.1, 0.15, matWood).rotation.x = -0.1; // Grip
-        addBox(shotgun, 0.08, 0.06, 0.6, 0, 0, -0.1, matBlack); // Barrel
-        addBox(shotgun, 0.08, 0.04, 0.4, 0, -0.05, -0.1, matWood); // Pump
-        this.weaponModels[WeaponType.SHOTGUN] = shotgun;
-
-        // --- SMG ---
-        const smg = new THREE.Group();
-        addBox(smg, 0.05, 0.15, 0.08, 0, -0.1, 0.15, matBlack).rotation.x = -0.1;
-        addBox(smg, 0.06, 0.08, 0.4, 0, 0, 0, matGrey);
-        addBox(smg, 0.04, 0.2, 0.06, 0, -0.1, 0, matBlack);
-        this.weaponModels[WeaponType.SMG] = smg;
-
-        // --- Rifle ---
-        const rifle = new THREE.Group();
-        addBox(rifle, 0.05, 0.15, 0.1, 0, -0.1, 0.2, matBlack).rotation.x = -0.1;
-        addBox(rifle, 0.06, 0.08, 0.6, 0, 0, -0.1, matGrey);
-        addBox(rifle, 0.04, 0.2, 0.06, 0, -0.1, 0, matBlack).rotation.x = 0.2;
-        this.weaponModels[WeaponType.RIFLE] = rifle;
-
-        // --- LMG ---
-        const lmg = new THREE.Group();
-        addBox(lmg, 0.06, 0.15, 0.1, 0, -0.1, 0.3, matWood).rotation.x = -0.1;
-        addBox(lmg, 0.08, 0.1, 0.6, 0, 0, 0, matBlack);
-        addBox(lmg, 0.04, 0.04, 0.8, 0, 0, -0.6, matGrey);
-        addBox(lmg, 0.15, 0.15, 0.1, 0.1, 0, 0.1, matGreen);
-        this.weaponModels[WeaponType.LMG] = lmg;
-
-        // --- Sniper ---
-        const sniper = new THREE.Group();
-        addBox(sniper, 0.06, 0.15, 0.1, 0, -0.1, 0.2, matWood).rotation.x = -0.1;
-        addBox(sniper, 0.06, 0.06, 0.8, 0, 0, -0.2, matBlack);
-        addBox(sniper, 0.08, 0.08, 0.3, 0, 0, 0.1, matWood);
-        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2), matBlack);
-        scope.rotation.x = Math.PI / 2; scope.position.set(0, 0.08, 0); sniper.add(scope);
-        this.weaponModels[WeaponType.SNIPER] = sniper;
-
-        // --- Laser Rifle ---
-        const laser = new THREE.Group();
-        addBox(laser, 0.06, 0.15, 0.1, 0, -0.1, 0.2, matMetal).rotation.x = -0.1;
-        addBox(laser, 0.08, 0.08, 0.6, 0, 0, -0.1, matMetal); // Body
-        addBox(laser, 0.02, 0.02, 0.7, 0.03, 0, -0.15, new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff })); // Rails
-        addBox(laser, 0.02, 0.02, 0.7, -0.03, 0, -0.15, new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff }));
-        this.weaponModels[WeaponType.LASER] = laser;
-
-        // --- Crossbow ---
-        const crossbow = new THREE.Group();
-        addBox(crossbow, 0.05, 0.12, 0.1, 0, -0.1, 0.2, matWood).rotation.x = -0.1;
-        addBox(crossbow, 0.08, 0.04, 0.5, 0, 0, 0, matWood); // Stock
-        const bow = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 8, 20, Math.PI), matMetal);
-        bow.rotation.x = Math.PI / 2; bow.rotation.z = Math.PI; bow.position.set(0, 0, -0.25);
-        crossbow.add(bow);
-        this.weaponModels[WeaponType.CROSSBOW] = crossbow;
-
-        // --- Launcher ---
-        const launcher = new THREE.Group();
-        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.0), matGreen);
-        tube.rotation.x = Math.PI / 2; launcher.add(tube);
-        addBox(launcher, 0.05, 0.15, 0.1, 0, -0.15, 0.2, matBlack).rotation.x = -0.1;
-        this.weaponModels[WeaponType.LAUNCHER] = launcher;
-
-        // --- BFG ---
-        const bfg = new THREE.Group();
-        addBox(bfg, 0.15, 0.2, 0.6, 0, 0, 0, matGreen);
-        addBox(bfg, 0.1, 0.1, 0.8, 0.1, 0, -0.2, matGrey);
-        addBox(bfg, 0.1, 0.1, 0.8, -0.1, 0, -0.2, matGrey);
-        this.weaponModels[WeaponType.BFG] = bfg;
-
-        // --- Sword ---
-        const sword = new THREE.Group();
-        const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15), matWood);
-        hilt.rotation.x = Math.PI / 2; hilt.position.set(0, 0, 0.15); sword.add(hilt);
-        addBox(sword, 0.15, 0.02, 0.02, 0, 0, 0.08, matMetal);
-        addBox(sword, 0.04, 0.01, 0.7, 0, 0, -0.25, matMetal);
-        sword.rotation.set(0, -0.2, 0.2);
-        this.weaponModels[WeaponType.SWORD] = sword;
-
-        // --- Katana ---
-        const katana = new THREE.Group();
-        const kHilt = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2), matBlack);
-        kHilt.rotation.x = Math.PI / 2; kHilt.position.set(0, 0, 0.2); katana.add(kHilt);
-        addBox(katana, 0.06, 0.01, 0.01, 0, 0, 0.1, matBlack); // Tsuba
-        const kBlade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.005, 0.9), matMetal);
-        kBlade.position.set(0, 0, -0.35);
-        // Curve the blade slightly? Hard with box. Just rotate slightly.
-        kBlade.rotation.x = -0.05;
-        katana.add(kBlade);
-        katana.rotation.set(0, -0.2, 0.2);
-        this.weaponModels[WeaponType.KATANA] = katana;
-
-        // --- Axe ---
-        const axe = new THREE.Group();
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8), matWood);
-        handle.rotation.x = Math.PI / 2; handle.position.set(0, -0.2, 0); axe.add(handle);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.05), matMetal);
-        head.position.set(0, 0, -0.3); axe.add(head);
-        axe.rotation.set(0, -0.2, 0.2);
-        this.weaponModels[WeaponType.AXE] = axe;
-
-        // Add all to container, hidden
-        Object.values(this.weaponModels).forEach(model => {
+        Object.values(WeaponType).forEach(type => {
+            const model = WeaponFactory.createWeaponMesh(type);
             model.visible = false;
+            this.weaponModels[type] = model;
             this.weaponContainer.add(model);
         });
     }
@@ -220,19 +156,29 @@ export class Player {
 
         // Update Visuals
         Object.values(this.weaponModels).forEach(model => model.visible = false);
-        if (this.weaponModels[type]) this.weaponModels[type].visible = true;
-
-        // Update HUD
-        document.getElementById('weapon-display').innerText = type;
-        this.updateAmmoDisplay();
+        
+        if (type && this.weaponModels[type]) {
+            this.weaponModels[type].visible = true;
+            document.getElementById('weapon-display').innerText = type;
+            this.updateAmmoDisplay();
+        } else {
+            // Empty slot (Hands)
+            document.getElementById('weapon-display').innerText = "HANDS";
+            document.getElementById('ammo-display').innerText = "-";
+        }
     }
 
     updateAmmoDisplay() {
         const type = this.getCurrentWeaponType();
+        if (!type) {
+             document.getElementById('ammo-display').innerText = "-";
+             return;
+        }
+
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
 
-        const text = config.ammo === Infinity ? "∞" : `${state.ammo} / ${state.maxAmmo}`;
+        const text = config.magSize === Infinity ? "∞" : `${state.mag} / ${state.reserve}`;
         document.getElementById('ammo-display').innerText = text;
     }
 
@@ -263,13 +209,21 @@ export class Player {
 
     reload() {
         const type = this.getCurrentWeaponType();
+        if (!type) return;
+
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
 
-        if (config.ammo === Infinity) return;
-        if (state.ammo === config.maxAmmo) return;
+        if (config.magSize === Infinity) return;
+        if (state.mag === config.magSize) return; // Full mag
+        if (state.reserve <= 0) return; // No ammo
 
-        state.ammo = config.maxAmmo;
+        const needed = config.magSize - state.mag;
+        const amount = Math.min(needed, state.reserve);
+
+        state.mag += amount;
+        state.reserve -= amount;
+        
         this.updateAmmoDisplay();
 
         // Visual feedback
@@ -284,20 +238,22 @@ export class Player {
         if (this.isDead || this.attackCooldown > 0) return;
 
         const type = this.getCurrentWeaponType();
+        if (!type) return; // No weapon
+
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
 
         // Check Ammo
-        if (config.ammo !== Infinity) {
-            if (state.ammo <= 0) {
-                this.reload(); // Auto-reload on empty
+        if (config.magSize !== Infinity) {
+            if (state.mag <= 0) {
+                // Click sound / dry fire feedback could go here
                 return;
             }
         }
 
         // Decrement Ammo
-        if (config.ammo !== Infinity) {
-            state.ammo--;
+        if (config.magSize !== Infinity) {
+            state.mag--;
             this.updateAmmoDisplay();
         }
 
@@ -388,10 +344,16 @@ export class Player {
             if (type === WeaponType.BFG) {
                 projectile.isBFG = true;
                 projectile.radius = config.radius;
-                projectile.mesh.geometry = new THREE.SphereGeometry(0.5, 16, 16);
+                projectile.mesh = Projectile.createPlasma();
+                projectile.mesh.position.copy(spawnPos);
+                // BFG moves slow but spins
+                projectile.spinRate = new THREE.Vector3(0, 0, 5); 
             } else if (type === WeaponType.LAUNCHER) {
                 projectile.isExplosive = true;
                 projectile.explosionRadius = config.radius;
+                projectile.mesh = Projectile.createMissile();
+                projectile.mesh.position.copy(spawnPos);
+                projectile.mesh.lookAt(spawnPos.clone().add(spreadDir));
             } else if (type === WeaponType.CROSSBOW) {
                 // Arrow Visual
                 const arrowGroup = new THREE.Group();
@@ -402,6 +364,10 @@ export class Player {
                 tip.rotation.x = -Math.PI / 2;
                 tip.position.z = 0.2;
                 arrowGroup.add(tip);
+                // Fins
+                const fin = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                fin.position.z = -0.15;
+                arrowGroup.add(fin);
 
                 // Replace default projectile mesh
                 projectile.mesh = arrowGroup;
@@ -461,16 +427,79 @@ export class Player {
     takeDamage(amount) {
         this.hp -= amount;
         document.getElementById('hp-display').innerText = Math.floor(this.hp);
-        document.body.style.backgroundColor = 'red';
-        setTimeout(() => document.body.style.backgroundColor = 'black', 50);
+        
+        // Red Flash Effect
+        const flash = document.createElement('div');
+        flash.style.position = 'absolute';
+        flash.style.top = '0';
+        flash.style.left = '0';
+        flash.style.width = '100%';
+        flash.style.height = '100%';
+        flash.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
+        flash.style.pointerEvents = 'none';
+        flash.style.zIndex = '999';
+        flash.style.transition = 'opacity 0.2s';
+        document.body.appendChild(flash);
+
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 200);
+        }, 50);
+
         if (this.hp <= 0) this.die();
     }
 
     die() {
+        if (this.isDead) return;
         this.isDead = true;
-        document.getElementById('game-over-screen').style.display = 'flex';
-        document.getElementById('final-score').innerText = "SCORE: " + this.score;
         document.exitPointerLock();
+
+        // 1. Trigger Shutdown Screen
+        const screen = document.getElementById('shutdown-screen');
+        const textContainer = document.getElementById('shutdown-text');
+        screen.style.display = 'flex';
+        screen.style.background = '#000'; // Pure black for "Power off" feel
+        
+        const lines = [
+            "CRITICAL ERROR: SYSTEM FAILURE",
+            "LIFE SUPPORT... OFFLINE",
+            "WEAPON SYSTEMS... TERMINATED",
+            "INITIATING MEMORY DUMP...",
+            "...",
+            "SIGNAL LOST."
+        ];
+        
+        // Typewriter Effect
+        let lineIndex = 0;
+        let charIndex = 0;
+        
+        // Disable game loop interaction (managed by isDead flag)
+        
+        const typeLine = () => {
+             if (lineIndex >= lines.length) {
+                 // Sequence complete, show real game over
+                 setTimeout(() => {
+                     document.getElementById('game-over-screen').style.display = 'flex';
+                     screen.style.display = 'none'; // Hide terminal
+                 }, 1000);
+                 return;
+             }
+             
+             const currentLine = lines[lineIndex];
+             if (charIndex < currentLine.length) {
+                 textContainer.innerHTML = lines.slice(0, lineIndex).join('<br>') + '<br>' + currentLine.substring(0, charIndex + 1) + '<span class="cursor"></span>';
+                 charIndex++;
+                 setTimeout(typeLine, 30); // Typing speed
+             } else {
+                 lineIndex++;
+                 charIndex = 0;
+                 setTimeout(typeLine, 300); // Line pause
+             }
+        };
+        
+        typeLine();
+
+        document.getElementById('final-score').innerText = "SCORE: " + this.score;
 
         // Submit Score to Leaderboard
         if (window.submitScore) {
@@ -478,27 +507,148 @@ export class Player {
         }
     }
 
+    addAmmoToAll(percent) {
+        Object.keys(this.weaponState).forEach(type => {
+            // Only refill unlocked weapons
+            if (this.inventory.includes(type)) {
+                const config = WeaponConfig[type];
+                if (config.magSize !== Infinity) {
+                    const amount = Math.floor(this.weaponState[type].maxReserve * percent);
+                    this.weaponState[type].reserve = Math.min(this.weaponState[type].reserve + amount, this.weaponState[type].maxReserve);
+                }
+            }
+        });
+        this.updateAmmoDisplay();
+    }
+
     addWeapon(type) {
         if (!this.inventory.includes(type)) {
-            this.inventory.push(type);
-            // Auto switch? Maybe notify user.
-            const notif = document.createElement('div');
-            notif.innerText = 'ACQUIRED: ' + type;
-            notif.style.cssText = 'position:absolute; top:20%; left:50%; transform:translate(-50%,-50%); color:#0f0; font-size:30px; font-weight:bold; text-shadow:0 0 10px #0f0; animation: fadeOut 2s forwards;';
-            document.body.appendChild(notif);
-            setTimeout(() => notif.remove(), 2000);
+            // Find first empty slot
+            const emptyIndex = this.inventory.indexOf(null);
+            if (emptyIndex !== -1) {
+                this.inventory[emptyIndex] = type;
+                this.switchWeapon(emptyIndex); // Auto-switch to new gun
+                this.createFloatingText(this.position, `PICKED UP ${type}`, "#00ff00");
+            } else {
+                // Inventory Full: SWAP current slot
+                const currentType = this.inventory[this.currentSlot];
+                if (currentType) {
+                    // Drop current
+                    // Calculate drop position (in front of player)
+                    const dropPos = this.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
+                    dropPos.y += 1;
+                    
+                    // We need access to Game to spawn pickup. 
+                    // Player doesn't have direct ref to Game, but has Scene.
+                    // We can cheat and attach a callback or event, OR use a Global/Utils helper if available.
+                    // Or... cleaner: Game passes a "spawnPickup" callback to Player?
+                    // Currently Game has `spawnPickup`.
+                    // Let's check constructor.
+                    // Constructor has `scene, projectiles`. No Game ref.
+                    
+                    // Workaround: We will emit a custom event on document
+                    const event = new CustomEvent('player-drop-item', { 
+                        detail: { type: currentType, position: dropPos } 
+                    });
+                    document.dispatchEvent(event);
+                }
+                
+                // Replace
+                this.inventory[this.currentSlot] = type;
+                
+                // Reset State for new weapon
+                const cfg = WeaponConfig[type];
+                this.weaponState[type] = {
+                    mag: cfg.magSize,
+                    reserve: cfg.maxReserve,
+                    maxReserve: cfg.maxReserve
+                };
+                
+                this.switchWeapon(this.currentSlot);
+                this.createFloatingText(this.position, `SWAPPED ${type}`, "#00ff00");
+            }
         } else {
             // Refill ammo
             if (this.weaponState[type]) {
-                this.weaponState[type].ammo = WeaponConfig[type].maxAmmo;
-                this.updateAmmoDisplay();
-
-                const notif = document.createElement('div');
-                notif.innerText = 'AMMO REFILLED: ' + type;
-                notif.style.cssText = 'position:absolute; top:20%; left:50%; transform:translate(-50%,-50%); color:#ff0; font-size:20px; font-weight:bold; animation: fadeOut 2s forwards;';
-                document.body.appendChild(notif);
-                setTimeout(() => notif.remove(), 2000);
+                const config = WeaponConfig[type];
+                if (config.magSize !== Infinity) {
+                    const amount = Math.floor(config.maxReserve * 0.5); // 50% refill
+                    const oldReserve = this.weaponState[type].reserve;
+                    this.weaponState[type].reserve = Math.min(this.weaponState[type].reserve + amount, this.weaponState[type].maxReserve);
+                    
+                    const added = this.weaponState[type].reserve - oldReserve;
+                    if (added > 0) {
+                        this.createFloatingText(this.position, `+${added} ${type} AMMO`, "#00ffff");
+                    } else {
+                        // Already full
+                        this.createFloatingText(this.position, `${type} FULL`, "#aaaaaa");
+                    }
+                    this.updateAmmoDisplay();
+                }
             }
         }
+    }
+
+    removeWeapon(index) {
+        if (this.inventory[index]) {
+            const type = this.inventory[index];
+            this.inventory[index] = null;
+            delete this.weaponState[type];
+            this.createFloatingText(this.position, `DELETED ${type}`, "#ff0000");
+            
+            // If we removed current weapon, switch to something else
+            if (index === this.currentSlot) {
+                // Find first valid
+                const validIdx = this.inventory.findIndex(x => x !== null);
+                if (validIdx !== -1) {
+                    this.switchWeapon(validIdx);
+                } else {
+                    // No weapons left, clear model
+                    this.currentSlot = index;
+                    if (this.currentWeaponModel) this.currentWeaponModel.visible = false;
+                }
+            }
+        }
+    }
+
+    applyRecoil() {
+        // Pitch up (negative X)
+        this.camera.rotation.x += 0.05; // Kick
+        this.recoilRecovery += 0.05;
+    }
+
+    applyScreenShake(intensity = 0.2) {
+        this.shakeTime = 0.2;
+        this.shakeIntensity = intensity;
+    }
+
+    createFloatingText(pos, text, color) {
+        // Create DOM element for easier management than 3D text
+        const el = document.createElement('div');
+        el.innerText = text;
+        el.style.position = 'absolute';
+        el.style.color = color;
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '20px';
+        el.style.textShadow = '1px 1px 0 #000';
+        el.style.pointerEvents = 'none';
+        
+        // Initial 2D Project
+        // We need update loop to sync position... or just CSS animation "float up and fade"
+        // Let's do simple center screen float up
+        el.style.left = '50%';
+        el.style.top = '40%';
+        el.style.transform = 'translate(-50%, -50%)';
+        el.style.transition = 'all 1.0s';
+        
+        document.body.appendChild(el);
+        
+        // Animate
+        setTimeout(() => {
+            el.style.top = '30%';
+            el.style.opacity = '0';
+        }, 50);
+        
+        setTimeout(() => el.remove(), 1000);
     }
 }
