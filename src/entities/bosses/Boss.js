@@ -3,7 +3,8 @@ import * as THREE from 'three';
 
 export class Boss extends Enemy {
     constructor(scene, player, type, position) {
-        super(scene, player, type);
+        super(scene, player, type); // Note: Enemy(scene, pos) consumes player as pos if mismatched
+        this.player = player; // Fix: Store player reference
         this.isBoss = true;
         this.maxHp = 5000;
         this.hp = 5000;

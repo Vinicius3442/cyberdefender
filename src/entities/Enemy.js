@@ -126,6 +126,17 @@ export class Enemy {
     }
 
     update(dt, playerPosition) {
-        // Override in subclasses
+        // Default movement override
+        // Can be reused by subclasses or called via super.update() if they implemented it
+        // But most subclasses implement their own update.
+        // We need to check subclasses.
+    }
+    
+    // Helper for subclasses
+    updateGroundPosition() {
+        if (this.scene.userData.getTerrainHeight) {
+            const h = this.scene.userData.getTerrainHeight(this.mesh.position.x, this.mesh.position.z);
+            this.mesh.position.y = h;
+        }
     }
 }

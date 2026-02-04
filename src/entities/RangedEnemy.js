@@ -58,6 +58,9 @@ export class RangedEnemy extends Enemy {
                 .normalize();
             direction.y = 0;
             this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
+            
+            // Snap to ground
+            this.updateGroundPosition();
         } else {
             // Shoot
             this.attackTimer -= dt;

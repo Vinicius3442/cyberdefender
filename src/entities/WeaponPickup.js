@@ -23,7 +23,15 @@ export class WeaponPickup {
         }
 
         this.mesh = this._createMesh();
+        this.mesh = this._createMesh();
         this.mesh.position.copy(this.position);
+        
+        // Snap to ground initially
+        if (this.scene.userData.getTerrainHeight) {
+            const h = this.scene.userData.getTerrainHeight(this.position.x, this.position.z);
+            this.mesh.position.y = h + 1.0; // Initial float
+        }
+        
         this.scene.add(this.mesh);
 
         this.yOffset = 0; // New property for bobbing
@@ -59,7 +67,13 @@ export class WeaponPickup {
 
     update(dt, playerPos) {
         this.mesh.rotation.y += dt * 2;
-        this.mesh.position.y = 1.0 + Math.sin(Date.now() * 0.003) * 0.2;
+        
+        let groundH = 0;
+        if (this.scene.userData.getTerrainHeight) {
+            groundH = this.scene.userData.getTerrainHeight(this.mesh.position.x, this.mesh.position.z);
+        }
+        
+        this.mesh.position.y = groundH + 1.0 + Math.sin(Date.now() * 0.003) * 0.2;
 
         if (this.mesh.position.distanceTo(playerPos) < this.radius) {
             return true; // Picked up

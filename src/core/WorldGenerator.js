@@ -15,6 +15,35 @@ export class WorldGenerator {
         this.createCyberTrees();
     }
 
+    spawnBossArena(center) {
+        // Clear props near center
+        // (Optional optimization: remove props)
+
+        // Create Lava Ring
+        const ringGeo = new THREE.TorusGeometry(60, 2, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.copy(center);
+        ring.position.y = 0.5;
+        this.scene.add(ring);
+        
+        // Add Warning Light
+        const light = new THREE.PointLight(0xff0000, 2, 80);
+        light.position.set(center.x, 20, center.z);
+        this.scene.add(light);
+    }
+
+    getHeight(x, z) {
+        // Deterministic Noise Function
+        // Combine sine waves for localized hills/valleys
+        const h1 = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
+        const h2 = Math.sin(x * 0.3 + 100) * Math.cos(z * 0.3 + 100) * 0.5;
+        // Add a "crater" or "flat valley" logic?
+        // For now, simple wave sum
+        return h1 + h2;
+    }
+
     createGround() {
         // Post-Apocalyptic Ground (Charred/Dark)
         const geometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 64, 64);
@@ -23,13 +52,36 @@ export class WorldGenerator {
         const posAttribute = geometry.attributes.position;
         for (let i = 0; i < posAttribute.count; i++) {
             const x = posAttribute.getX(i);
-            const y = posAttribute.getY(i);
-            // Z is up in PlaneGeometry default? No, usually XY plane.
-            // We rotate X -90 later. So Z is height.
+            const y = posAttribute.getY(i); // This is actually local coordinate relative to plane center
+            // PlaneGeometry is created on XY plane. We rotate it later?
+            // Wait, standard PlaneGeometry is X, Y. 
+            // When we rotate X -90, Y becomes -Z.
+            // So logic:
+            // Local X -> World X
+            // Local Y -> World -Z (since we rotate -PI/2)
             
-            // Simple noise
-            const height = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 2 + (Math.random() - 0.5) * 0.5;
-            posAttribute.setZ(i, height); // Height adjustment
+            // Actually simpler:
+            // Just apply height to Z (which becomes Y after rotation? No.)
+            // PlaneGeometry: vertices are (x, y, 0).
+            // Rotation -90 deg X: (x, 0, -y) or (x, z, y)?
+            // Visual: Flat on ground. Normal pointing up (Y).
+            // Z attribute becomes Y height? No.
+            
+            // Let's stick to standard Three.js approach:
+            // Plane lying on XZ plane? No, Plane is XY default.
+            // We rotate it. So Local Z becomes World -Y? Or World Z?
+            
+            // Let's just use a helper or assume standard mapping:
+            // After rotation x=-PI/2:
+            // Local X -> World X
+            // Local Y -> World -Z
+            // Local Z -> World Y (Height)
+            
+            const worldX = x;
+            const worldZ = -y; 
+            
+            const height = this.getHeight(worldX, worldZ);
+            posAttribute.setZ(i, height); // Displace "flat" plane
         }
         
         geometry.computeVertexNormals();
@@ -120,7 +172,8 @@ export class WorldGenerator {
             foliage.castShadow = true;
             group.add(foliage);
 
-            group.position.set(x, 0, z);
+            const h = this.getHeight(x, z);
+            group.position.set(x, h, z);
             this.scene.add(group);
             this.props.push(group);
         }

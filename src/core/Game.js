@@ -11,7 +11,7 @@ import { RemotePlayer } from '../entities/RemotePlayer.js';
 import { WeaponConfig } from './WeaponSystem.js';
 import { WeaponPickup } from '../entities/WeaponPickup.js';
 import { WorldGenerator } from './WorldGenerator.js';
-import { ObserverBoss } from '../entities/bosses/ObserverBoss.js';
+import { AtomBoss } from '../entities/bosses/AtomBoss.js';
 
 export class Game {
     constructor(mode = 'SP', mpParams = {}) {
@@ -72,10 +72,9 @@ export class Game {
         // World Generation
         this.worldGen = new WorldGenerator(this.scene);
         this.worldGen.generateLevel();
-
-        // Infinite Grid Visual (Optional - keep for reference or remove?)
-        // const gridHelper = new THREE.GridHelper(1000, 100, 0x555555, 0xbbbbbb);
-        // this.scene.add(gridHelper);
+        
+        // Expose terrain helper to scene for entities
+        this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
 
         // Input
         this.input = new Input();
@@ -86,12 +85,15 @@ export class Game {
         // Player
         this.player = new Player(this.camera, this.input, this.scene, this.projectiles, this.playerSkinURL);
 
+        // Reference link
+        this.player.game = this; // Give player access to game for height check
+
+        // Systems
+        this.particleSystem = new ParticleSystem(this.scene);
         // Systems
         this.particleSystem = new ParticleSystem(this.scene);
         this.upgradeManager = new UpgradeManager(this); // Keep for Drop UI? Or remove?
-        // User said "backpack" for weapons. UpgradeManager handled "Cards". 
-        // We probably need to refactor UpgradeManager into InventoryManager later.
-
+        
         if (this.mode === 'SP') {
             this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
         }
@@ -118,6 +120,21 @@ export class Game {
             }
         });
 
+        // KONAMI CODE CHEAT
+        this.konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+        this.konamiIndex = 0;
+        document.addEventListener('keydown', (e) => {
+            if (e.key === this.konamiCode[this.konamiIndex]) {
+                this.konamiIndex++;
+                if (this.konamiIndex === this.konamiCode.length) {
+                    this.activateKonamiCheat();
+                    this.konamiIndex = 0;
+                }
+            } else {
+                this.konamiIndex = 0; // Reset
+            }
+        });
+
         // Setup MP
         if (this.mode === 'MP') {
             this.initMultiplayer();
@@ -132,6 +149,13 @@ export class Game {
             this.isInLobby = true;
             this.animate(); // Logic loop runs to handle network, but player disabled
         }
+    }
+
+    getTerrainHeight(x, z) {
+        if (this.worldGen) {
+            return this.worldGen.getHeight(x, z);
+        }
+        return 0;
     }
 
     initMultiplayer() {
@@ -210,16 +234,24 @@ export class Game {
 
         this.isPaused = !this.isPaused;
 
-        const pauseMenu = document.getElementById('pause-menu');
+        const gameOverScreen = document.getElementById('game-over');
         if (this.isPaused) {
-            if (pauseMenu) pauseMenu.style.display = 'flex';
-            document.exitPointerLock();
+            if (gameOverScreen) {
+                gameOverScreen.style.display = 'flex';
+                document.exitPointerLock();
+                // Wait for click to restart
+                setTimeout(() => {
+                    gameOverScreen.innerHTML += '<p style="margin-top:20px; font-size: 20px; color: #fff;">CLICK TO RESTART</p>';
+                    gameOverScreen.onclick = () => location.reload();
+                }, 2000); // 2s delay before showing restart prompt
+            }
             this.input.keys.attack = false; // Fix: Stop shooting
             this.input.keys.forward = false;
             this.input.keys.backward = false;
             this.input.keys.left = false;
             this.input.keys.right = false;
         } else {
+            const pauseMenu = document.getElementById('pause-menu');
             if (pauseMenu) pauseMenu.style.display = 'none';
             document.body.requestPointerLock();
             this.clock.getDelta(); // Reset clock to avoid huge dt spike
@@ -373,15 +405,11 @@ export class Game {
     }
 
     getWeightedRandomDrop() {
-        // 1. Ammo (High chance if not given type) - actually WeaponPickup handles null=random.
-        // But we want weighted weapons OR ammo.
-        // Let's say: 40% Ammo, 60% Weapon.
-        if (Math.random() < 0.4) return 'AMMO';
-
+        if (Math.random() < 0.3) return 'AMMO'; 
         const weights = {
-            'common': 50,
-            'uncommon': 30,
-            'rare': 15,
+            'common': 40,
+            'uncommon': 35,
+            'rare': 20,
             'legendary': 5
         };
         
@@ -399,35 +427,13 @@ export class Game {
         else if (rand > 50) tier = 'uncommon';
 
         const pool = tiers[tier];
-        const weaponKey = pool[Math.floor(Math.random() * pool.length)]; // String key
-        const typeObj = WeaponConfig[eval('WeaponType.' + weaponKey)] ? eval('WeaponType.' + weaponKey) : weaponKey; 
-        // Wait, WeaponConfig uses values like 'Pistol', 'Revolver'. 
-        // The tiers should use the VALUES from WeaponType, or keys?
-        // WeaponType is an object. Keys are caps, values are strings.
-        // Let's safe look up by iterating WeaponType to find matching key? 
-        // Actually, let's just hardcode the VALUES in the tiers for simplicity, or map key -> value.
-        // Simpler: Just resolve the string key to the value using the WeaponType export (imported as local var? No, imported as module).
+        const weaponKey = pool[Math.floor(Math.random() * pool.length)]; // String key like 'PISTOL'
         
-        // Accessing WeaponType here is tricky if it's imported. Game.js imports { WeaponType }? No, it imports WeaponConfig.
-        // I need to import WeaponType in Game.js to use it properly or check imports.
-        // Imports: `import { WeaponConfig } from './WeaponSystem.js';`
-        // I should verify if WeaponConfig KEYS are the values (e.g. 'Pistol'). Yes they are.
+        // We just need to return the KEY string (e.g. 'PISTOL') because spawnPickup handles it.
+        // WeaponPickup expects a type string which matches keys in WeaponConfig.
+        // Our 'tiers' arrays ALREADY contain these keys.
         
-        // So I can just return the string 'Pistol' etc.
-        // My tiers used keys like 'PISTOL'. I need to map 'PISTOL' -> 'Pistol'.
-        
-        // Let's redefine tiers using actual string values from a helper or manually.
-        // Manual mapping is safest.
-        
-        const tierValues = {
-            'common': ['Pistol', 'SMG', 'Shotgun', 'Bat', 'Knife', 'MP5'],
-            'uncommon': ['Rifle', 'Sniper', 'Revolver', 'M4A1', 'SCAR-H', 'P90', 'Battle Axe'],
-            'rare': ['Minigun', 'AA Missile', 'Desert Eagle', 'Katana', 'Famas', 'Grenade Launcher', 'Flamethrower'],
-            'legendary': ['BFG-8000', 'Railgun', 'Lightsaber', 'Barrett .50', 'Freeze Ray', 'Alien Blaster']
-        };
-        
-        const valPool = tierValues[tier];
-        return valPool[Math.floor(Math.random() * valPool.length)];
+        return weaponKey;
     }
 
     spawnEnemy(type) {
@@ -440,23 +446,58 @@ export class Game {
         console.log("SPAWNING BOSS FOR WAVE", waveNum);
         
         // Determine Boss Type
-        // Wave 10: Observer
-        // Wave 0 (Debug): Observer
-        
-        const pos = new THREE.Vector3(0, 20, -50); // High up logic?
+        // Wave 10: Atom Boss (Nucleus)
+        const pos = new THREE.Vector3(0, 15, -40); 
         
         if (waveNum % 10 === 0) {
-            const boss = new ObserverBoss(this.scene, this.player, pos);
-            
-            // INJECT PROJECTILES ARRAY SO BOSS CAN SHOOT
+            const boss = new AtomBoss(this.scene, this.player, pos);
             boss.projectiles = this.projectiles; 
             
             this.enemies.push(boss);
             this.scene.add(boss.mesh);
+
+            // Spawn Arena
+            this.worldGen.spawnBossArena(new THREE.Vector3(0,0,0));
             
-            // Dramatic Effect?
-            // this.particleSystem.createExplosion(pos, 0xff0000);
+            // Dramatic Effect (Camera Shake / Sound)
+            this.player.applyScreenShake(0.5);
         }
+    }
+
+    activateKonamiCheat() {
+        console.log("KONAMI CODE ACTIVATED!");
+        alert("CHEAT ACTIVATED: WAVE 10 + ARSENAL");
+        
+        // 1. Skip to Wave 10
+        if (this.waveManager) {
+            this.waveManager.currentWave = 9; // Will start next as 10
+            this.waveManager.startNextWave();
+        }
+        
+        // 2. Give UNIQUE Random Weapons (Fill Inventory)
+        const allTypes = Object.keys(WeaponConfig).filter(k => k !== 'AMMO');
+        // Shuffle
+        for (let i = allTypes.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allTypes[i], allTypes[j]] = [allTypes[j], allTypes[i]];
+        }
+        
+        // Take first 9 (or fewer if inventory smaller)
+        const maxSlots = 9;
+        for (let i = 0; i < Math.min(allTypes.length, maxSlots); i++) {
+            this.player.addWeapon(allTypes[i]);
+            // Force equip to ensure it registers? No, addWeapon works.
+        }
+        
+        // 3. Full Ammo
+        this.player.inventory.forEach(w => {
+            if (this.player.weaponState[w]) {
+                this.player.weaponState[w].reserve = 999;
+            }
+        });
+
+        // 4. Update UI
+        this.renderHotbar();
     }
 
     startMatch() {
@@ -628,10 +669,12 @@ export class Game {
                         this.enemies.splice(i, 1);
                         this.player.score += 100;
                         
-                        // Drop Logic (20% Chance)
-                        if (Math.random() < 0.2) { 
+                        // Drop Logic (Boosted to 50% Chance)
+                        if (Math.random() < 0.5) { 
                             const type = this.getWeightedRandomDrop();
-                            this.spawnPickup(e.mesh.position, type);
+                            if (type) {
+                                this.spawnPickup(e.mesh.position, type);
+                            }
                         }
                     }
                 }
@@ -711,6 +754,17 @@ export class Game {
         this.isPaused = true;
         document.exitPointerLock();
         this.input.keys.attack = false; // Stop shooting
+        
+        // WAVE COMPLETE HEAL
+        const healAmount = Math.floor(this.player.maxHp * 0.5);
+        const oldHp = this.player.hp;
+        this.player.hp = Math.min(this.player.hp + healAmount, this.player.maxHp);
+        const healed = Math.floor(this.player.hp - oldHp);
+        
+        if (healed > 0) {
+            this.player.createFloatingText(this.player.position, `WAVE CLEARED: +${healed} HP`, "#00ff00");
+             document.getElementById('hp-display').innerText = Math.floor(this.player.hp);
+        }
         
         const upgradeScreen = document.getElementById('upgrade-screen');
         if (upgradeScreen) {

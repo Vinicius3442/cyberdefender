@@ -205,8 +205,14 @@ btnPlay.addEventListener('click', () => {
     const nextLine = () => {
         if (lineIdx >= lines.length) {
             setTimeout(() => {
-                bootScreen.style.display = 'none';
-                startGame(playerName);
+                bootText.innerText += "\n\n[CLICK TO INITIALIZE]";
+                // Wait for click to actually start (to allow Pointer Lock)
+                const startHandler = () => {
+                   document.removeEventListener('click', startHandler);
+                   bootScreen.style.display = 'none';
+                   startGame(playerName);
+                };
+                document.addEventListener('click', startHandler);
             }, 800);
             return;
         }

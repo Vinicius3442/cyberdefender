@@ -23,7 +23,9 @@ export class WaveManager {
         this.enemiesToSpawn = 0;
         this.enemiesKilled = 0;
         this.waveActive = false;
+        this.waveActive = false;
         this.bossSpawned = false;
+        this.spawnTimer = 0;
     }
 
     update(dt) {
@@ -38,9 +40,18 @@ export class WaveManager {
             const progressBar = document.getElementById('wave-progress-bar');
             if (progressBar) progressBar.style.width = `${progress}%`;
 
-            if (this.enemies.length === 0) {
+            if (this.enemies.length === 0 && this.enemiesToSpawn === 0 && !this.waitingForBoss) {
                 this.waveInProgress = false;
                 this.game.showUpgradeScreen();
+            }
+
+            // Spawn Logic
+            if (this.enemiesToSpawn > 0) {
+                this.spawnTimer -= dt;
+                if (this.spawnTimer <= 0) {
+                    this.spawnEnemy();
+                    this.spawnTimer = 0.5; // Spawn every 0.5s
+                }
             }
         } else {
             // Initial start or waiting for next wave
@@ -80,9 +91,39 @@ export class WaveManager {
 
         // BOSS WAVE LOGIC
         if (this.currentWave % 10 === 0) {
-            this.totalEnemiesInWave = 1; // Only the boss for this wave
+            this.totalEnemiesInWave = 1;
             this.enemiesToSpawn = 1;
-            this.spawnEnemy(); // Immediately try to spawn the boss
+
+            // Lore Sequence
+            const loreUI = document.getElementById('lore-message');
+            loreUI.style.display = 'block';
+            loreUI.innerText = "WARNING: HIGH ENERGY SIGNATURE DETECTED";
+            
+            // Delay spawn
+            setTimeout(() => {
+                loreUI.style.display = 'none';
+                this.spawnEnemy(); // Spawn Boss after delay
+            }, 3000);
+            
+            // Note: spawnEnemy logic usually runs every frame via update -> check enemiesToSpawn.
+            // But we pause it? "enemiesToSpawn" is 1. update() will try to spawn immediately if we don't block it.
+            // We should use a "waveStarting" flag or just rely on the delay call to spawnEnemy manually?
+            // Actually spawnEnemy checks enemiesToSpawn. If we set enemiesToSpawn=0 initially then 1 later?
+            // Let's set enemiesToSpawn = 0 initially, then = 1 inside timeout.
+            // Delay spawn
+            this.waitingForBoss = true;
+            this.enemiesToSpawn = 0; 
+
+            setTimeout(() => {
+                const loreUI = document.getElementById('lore-message');
+                if (loreUI) loreUI.style.display = 'none';
+                
+                this.waitingForBoss = false;
+                this.enemiesToSpawn = 1;
+                // update() will pick it up
+                // this.spawnEnemy(); // Optional immediate spawn
+            }, 3000);
+
         } else {
             const numEnemies = 2 + Math.floor(this.currentWave * 1.5);
             this.totalEnemiesInWave = numEnemies;

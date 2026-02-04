@@ -54,5 +54,10 @@ export class TankEnemy extends Enemy {
 
         this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
         this.mesh.lookAt(playerPosition.x, this.mesh.position.y, playerPosition.z);
+        
+        // Fix height (Tank is big, origin might be center, adjust offset if needed)
+        // Base Enemy.updateGroundPosition sets y = groundH. 
+        // Tank origin mesh logic: legs at 0.5. So if mesh is at 0, legs are at 0.5. Correct.
+        this.updateGroundPosition();
     }
 }

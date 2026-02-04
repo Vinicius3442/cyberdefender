@@ -415,8 +415,15 @@ export class Player {
         this.position.y += this.velocity.y * dt;
         this.position.z += this.velocity.z * dt;
 
-        if (this.position.y < 1.6) {
-            this.position.y = 1.6;
+        // Ground Check
+        let groundHeight = 0;
+        if (this.game) {
+            groundHeight = this.game.getTerrainHeight(this.position.x, this.position.z);
+        }
+        const minHeight = groundHeight + 1.6;
+
+        if (this.position.y < minHeight) {
+            this.position.y = minHeight;
             this.velocity.y = 0;
             this.canJump = true;
         }

@@ -70,6 +70,9 @@ export class LauncherEnemy extends Enemy {
             this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
         }
 
+        // Clamp to ground
+        this.updateGroundPosition();
+
         this.attackTimer -= dt;
         if (this.attackTimer <= 0) {
             this.shoot(playerPosition);
