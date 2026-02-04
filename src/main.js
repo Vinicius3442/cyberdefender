@@ -184,7 +184,39 @@ document.addEventListener('mousemove', (e) => {
 // --- Start Game ---
 btnPlay.addEventListener('click', () => {
     const playerName = inputName.value || "Soldier";
-    startGame(playerName);
+    
+    // Play Boot Sequence
+    const bootScreen = document.getElementById('boot-sequence');
+    const bootText = document.getElementById('boot-text');
+    startScreen.style.display = 'none';
+    bootScreen.style.display = 'flex';
+    
+    const lines = [
+        "ESTABLISHING NEURAL LINK...",
+        "CONNECTING TO HOST: " + playerName.toUpperCase(),
+        "SYNCING WEAPON SYSTEMS...",
+        "INITIALIZING TACTICAL VISOR...",
+        "...",
+        "SYSTEM ONLINE."
+    ];
+    
+    let lineIdx = 0;
+    
+    const nextLine = () => {
+        if (lineIdx >= lines.length) {
+            setTimeout(() => {
+                bootScreen.style.display = 'none';
+                startGame(playerName);
+            }, 800);
+            return;
+        }
+        
+        bootText.innerText = lines.slice(0, lineIdx + 1).join('\n');
+        lineIdx++;
+        setTimeout(nextLine, 400 + Math.random() * 400); // Random delay
+    };
+    
+    nextLine();
 });
 
 if (btnResume) {

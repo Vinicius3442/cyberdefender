@@ -10,6 +10,8 @@ import { NetworkManager } from './NetworkManager.js';
 import { RemotePlayer } from '../entities/RemotePlayer.js';
 import { WeaponConfig } from './WeaponSystem.js';
 import { WeaponPickup } from '../entities/WeaponPickup.js';
+import { WorldGenerator } from './WorldGenerator.js';
+import { ObserverBoss } from '../entities/bosses/ObserverBoss.js';
 
 export class Game {
     constructor(mode = 'SP', mpParams = {}) {
@@ -67,22 +69,13 @@ export class Game {
         dirLight.shadow.camera.right = 20;
         this.scene.add(dirLight);
 
-        // Floor (Light Gray Grid)
-        const floorGeometry = new THREE.PlaneGeometry(1000, 1000); // Smaller reliable plane
-        const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0xcccccc, // Light Gray
-            roughness: 0.9,
-            metalness: 0.1
-        });
+        // World Generation
+        this.worldGen = new WorldGenerator(this.scene);
+        this.worldGen.generateLevel();
 
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-
-        // Infinite Grid Visual
-        const gridHelper = new THREE.GridHelper(1000, 100, 0x555555, 0xbbbbbb);
-        this.scene.add(gridHelper);
+        // Infinite Grid Visual (Optional - keep for reference or remove?)
+        // const gridHelper = new THREE.GridHelper(1000, 100, 0x555555, 0xbbbbbb);
+        // this.scene.add(gridHelper);
 
         // Input
         this.input = new Input();
@@ -437,6 +430,35 @@ export class Game {
         return valPool[Math.floor(Math.random() * valPool.length)];
     }
 
+    spawnEnemy(type) {
+        // ... (existing code, ensure it doesn't break) ...
+        // I will just append spawnBoss below standard spawn logic or near it.
+        // Actually, I need to read the file first to know where to put it properly.
+    }
+
+    spawnBoss(waveNum) {
+        console.log("SPAWNING BOSS FOR WAVE", waveNum);
+        
+        // Determine Boss Type
+        // Wave 10: Observer
+        // Wave 0 (Debug): Observer
+        
+        const pos = new THREE.Vector3(0, 20, -50); // High up logic?
+        
+        if (waveNum % 10 === 0) {
+            const boss = new ObserverBoss(this.scene, this.player, pos);
+            
+            // INJECT PROJECTILES ARRAY SO BOSS CAN SHOOT
+            boss.projectiles = this.projectiles; 
+            
+            this.enemies.push(boss);
+            this.scene.add(boss.mesh);
+            
+            // Dramatic Effect?
+            // this.particleSystem.createExplosion(pos, 0xff0000);
+        }
+    }
+
     startMatch() {
         if (this.mode === 'MP' && this.mpParams.host) {
             this.network.broadcastEvent('start_match', {});
@@ -722,8 +744,8 @@ export class Game {
         `;
 
         const uniforms = {
-            topColor: { value: new THREE.Color(0x001133) }, // Deep Blue
-            bottomColor: { value: new THREE.Color(0x000000) }, // Black Horizon
+            topColor: { value: new THREE.Color(0x000500) }, // Toxic Dark
+            bottomColor: { value: new THREE.Color(0x113311) }, // Toxic Green Horizon
             offset: { value: 33 },
             exponent: { value: 0.6 }
         };
@@ -739,8 +761,8 @@ export class Game {
         const sky = new THREE.Mesh(skyGeo, skyMat);
         this.scene.add(sky);
 
-        // Fog
-        this.scene.fog = new THREE.FogExp2(0x050510, 0.015);
+        // Fog (Toxic Green)
+        this.scene.fog = new THREE.FogExp2(0x051505, 0.02);
 
         // Stars
         const starGeo = new THREE.BufferGeometry();

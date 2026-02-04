@@ -20,6 +20,10 @@ export class WaveManager {
         this.timeBetweenWaves = 3.0;
         this.waveTimer = 0;
         this.totalEnemiesInWave = 0;
+        this.enemiesToSpawn = 0;
+        this.enemiesKilled = 0;
+        this.waveActive = false;
+        this.bossSpawned = false;
     }
 
     update(dt) {
@@ -67,20 +71,46 @@ export class WaveManager {
     }
 
     startNextWave() {
-        this.currentWave++;
+        this.currentWave++; // Use currentWave
         this.waveInProgress = true;
+        this.bossSpawned = false; // Reset boss flag for new wave
+
         const waveDisplay = document.getElementById('wave-display');
         if (waveDisplay) waveDisplay.innerText = this.currentWave;
 
-        const numEnemies = 2 + Math.floor(this.currentWave * 1.5);
-        this.totalEnemiesInWave = numEnemies;
-
-        for (let i = 0; i < numEnemies; i++) {
-            this.spawnEnemy();
+        // BOSS WAVE LOGIC
+        if (this.currentWave % 10 === 0) {
+            this.totalEnemiesInWave = 1; // Only the boss for this wave
+            this.enemiesToSpawn = 1;
+            this.spawnEnemy(); // Immediately try to spawn the boss
+        } else {
+            const numEnemies = 2 + Math.floor(this.currentWave * 1.5);
+            this.totalEnemiesInWave = numEnemies;
+            this.enemiesToSpawn = numEnemies;
         }
     }
 
     spawnEnemy() {
+        if (this.enemies.length >= this.maxEnemies) return;
+        if (this.enemiesToSpawn <= 0) return; // No more enemies to spawn for this wave
+
+        // BOSS WAVE LOGIC
+        if (this.currentWave % 10 === 0 && !this.bossSpawned) {
+             // Spawn Boss
+             this.game.spawnBoss(this.currentWave); // Assuming game has a spawnBoss method
+             this.bossSpawned = true;
+             this.enemiesToSpawn--; // Decrement as boss is spawned
+             return;
+        }
+        
+        if (this.bossSpawned) return; // Don't spawn minions while boss is alive (or maybe yes?)
+
+        const enemyType = this.getEnemyType();
+        this.game.spawnEnemy(enemyType); // Assuming game has a spawnEnemy method
+        this.enemiesToSpawn--;
+    }
+
+    getEnemyType() {
         const spawnPos2D = Utils.getRandomSpawnPosition(40, 15); // Increased radius
         const spawnPos = { 
             x: this.player.position.x + spawnPos2D.x, 
