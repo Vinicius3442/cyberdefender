@@ -29,19 +29,34 @@ export class UpgradeManager {
             img.src = this.game.player.skinURL;
             this.charImgContainer.appendChild(img);
         } else {
-            // Default Cute Face (Generated)
+            // Green Robot Face (Matrix Style)
             const canvas = document.createElement('canvas');
             canvas.width = 128; canvas.height = 128;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffff00'; // Yellow
-            ctx.fillRect(0, 0, 128, 128);
+            
+            // Background
             ctx.fillStyle = '#000';
-            ctx.beginPath(); ctx.arc(40, 50, 10, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(88, 50, 10, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(64, 70, 30, 0, Math.PI, false); ctx.stroke();
+            ctx.fillRect(0, 0, 128, 128);
+            
+            // Neon Green Eyes
+            ctx.fillStyle = '#4af626'; 
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#4af626';
+            
+            // Rectangular Eyes (matches ShellMenu)
+            const eyeW = 30;
+            const eyeH = 30;
+            
+            // Left Eye
+            ctx.fillRect(128/2 - 40, 128/2 - 15, eyeW, eyeH);
+            // Right Eye
+            ctx.fillRect(128/2 + 10, 128/2 - 15, eyeW, eyeH);
+            
+            ctx.shadowBlur = 0;
             
             const img = document.createElement('img');
             img.src = canvas.toDataURL();
+            img.style.border = "2px solid #4af626"; // Add border style
             this.charImgContainer.appendChild(img);
         }
 

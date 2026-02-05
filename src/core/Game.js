@@ -234,27 +234,40 @@ export class Game {
 
         this.isPaused = !this.isPaused;
 
-        const gameOverScreen = document.getElementById('game-over');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const pauseMenu = document.getElementById('pause-menu');
+
+        // Check if game over is active
+        const isGameOver = gameOverScreen && gameOverScreen.style.display !== 'none';
+
         if (this.isPaused) {
-            if (gameOverScreen) {
-                gameOverScreen.style.display = 'flex';
+            if (isGameOver) {
+                // Game Over takes precedence, ensure pointer is unlocked
                 document.exitPointerLock();
-                // Wait for click to restart
-                setTimeout(() => {
-                    gameOverScreen.innerHTML += '<p style="margin-top:20px; font-size: 20px; color: #fff;">CLICK TO RESTART</p>';
-                    gameOverScreen.onclick = () => location.reload();
-                }, 2000); // 2s delay before showing restart prompt
+            } else {
+                // Formatting: Pause Menu
+                if (pauseMenu) pauseMenu.style.display = 'flex';
+                document.exitPointerLock();
             }
-            this.input.keys.attack = false; // Fix: Stop shooting
+
+            // Stop Inputs
+            this.input.keys.attack = false; 
             this.input.keys.forward = false;
             this.input.keys.backward = false;
             this.input.keys.left = false;
             this.input.keys.right = false;
+            
         } else {
-            const pauseMenu = document.getElementById('pause-menu');
+            // Unpause
+            if (isGameOver) {
+                 // Cannot unpause during game over!
+                 this.isPaused = true; 
+                 return;
+            }
+
             if (pauseMenu) pauseMenu.style.display = 'none';
             document.body.requestPointerLock();
-            this.clock.getDelta(); // Reset clock to avoid huge dt spike
+            this.clock.getDelta(); // Reset clock
         }
     }
 
@@ -335,6 +348,38 @@ export class Game {
                  };
             }
 
+            // Drag & Drop
+            div.draggable = true;
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', i);
+                div.classList.add('dragging');
+            };
+            div.ondragend = () => {
+                div.classList.remove('dragging');
+            };
+            div.ondragover = (e) => {
+                e.preventDefault(); // Allow drop
+            };
+            div.ondrop = (e) => {
+                e.preventDefault();
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIndex = i;
+
+                if (fromIndex !== toIndex) {
+                    // Swap logic
+                    const temp = this.player.inventory[fromIndex];
+                    this.player.inventory[fromIndex] = this.player.inventory[toIndex];
+                    this.player.inventory[toIndex] = temp;
+                    
+                    // If we swapped the CURRENT slot, we must re-equip
+                    if (this.player.currentSlot === fromIndex || this.player.currentSlot === toIndex) {
+                        this.player.switchWeapon(this.player.currentSlot);
+                    }
+
+                    this.renderInventory();
+                }
+            };
+
             // Click to Swap/Equip
             div.onclick = () => {
                 this.player.switchWeapon(i);
@@ -400,6 +445,18 @@ export class Game {
     }
 
     spawnPickup(position, type = null) {
+        // Validation: Prevent "Hand" or invalid types
+        if (type && type !== 'AMMO' && !WeaponConfig[type]) {
+             console.warn("Attempted to spawn invalid pickup type:", type);
+             return;
+        }
+
+        // Limit Check: Max 3 items on ground
+        if (this.pickups.length >= 3) {
+            const old = this.pickups.shift(); // Remove oldest
+            this.scene.remove(old.mesh);
+        }
+
         const pickup = new WeaponPickup(this.scene, position, type);
         this.pickups.push(pickup);
     }
@@ -664,7 +721,9 @@ export class Game {
                 for (let i = this.enemies.length - 1; i >= 0; i--) {
                     const e = this.enemies[i];
                     e.update(dt, this.player.position);
-                    if (e.isDead) {
+                    
+                    // Only remove if fully dead and animation finished
+                    if (e.isDead && e.shouldRemove) {
                         this.scene.remove(e.mesh);
                         this.enemies.splice(i, 1);
                         this.player.score += 100;

@@ -85,6 +85,8 @@ export class Enemy {
 
         // Skip flashing if already flashing to avoid color glitching
         if (!this.isFlashing) {
+            this.playAnimation('hit'); // NEW: Trigger hit anim
+            
             this.isFlashing = true;
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
@@ -104,7 +106,7 @@ export class Enemy {
             });
 
             setTimeout(() => {
-                if (!this.isDead && this.mesh) {
+                if (this.mesh) { // Check existence
                     this.mesh.traverse((child) => {
                         if (child.isMesh && child.material && child.material.userData.originalEmissive !== undefined) {
                             child.material.emissive.setHex(child.material.userData.originalEmissive);
@@ -121,17 +123,51 @@ export class Enemy {
     }
 
     die() {
+        if (this.isDead) return;
         this.isDead = true;
-        // Particle effect could go here
+        this.playingDeathAnim = true;
+        this.playAnimation('die');
+        
+        // Remove after animation (e.g. 1s - faster per user request)
+        setTimeout(() => {
+            this.shouldRemove = true; // Signal Game.js to remove
+            if (this.scene && this.mesh && this.mesh.parent === this.scene) {
+                this.scene.remove(this.mesh);
+            }
+        }, 1000);
     }
 
     update(dt, playerPosition) {
-        // Default movement override
-        // Can be reused by subclasses or called via super.update() if they implemented it
-        // But most subclasses implement their own update.
-        // We need to check subclasses.
+        this.updateAnimations(dt);
+        if (this.isDead && !this.playingDeathAnim) { // If dead but no death anim defined/playing
+             // Stop logical updates
+             return;
+        }
+        if (this.playingDeathAnim && this.isDead) return; // Allow death anim to play but stop movement
+        // ... (subclasses handle transform updates)
     }
     
+    // Animation System
+    updateAnimations(dt) {
+        // Simple tween-like system
+        if (this.currentAnim) {
+             this.animTimer += dt;
+             // Logic per anim? Or generic keyframes?
+             // Ideally we just modify transforms here
+             if (this.currentAnim === 'attack') this.animAttack(this.animTimer);
+             if (this.currentAnim === 'die') this.animDie(this.animTimer);
+        }
+    }
+    
+    playAnimation(name) {
+        this.currentAnim = name;
+        this.animTimer = 0;
+    }
+
+    // Default implementations (can override)
+    animAttack(t) {}
+    animDie(t) {}
+
     // Helper for subclasses
     updateGroundPosition() {
         if (this.scene.userData.getTerrainHeight) {

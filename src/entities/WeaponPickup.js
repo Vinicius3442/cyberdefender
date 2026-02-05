@@ -19,7 +19,13 @@ export class WeaponPickup {
                  this.type = keys[Math.floor(Math.random() * keys.length)];
              }
         } else {
-            this.type = type;
+            // Validate type exists
+            if (type !== 'AMMO' && !WeaponType[type]) {
+                console.warn("Invalid pickup type, defaulting to AMMO:", type);
+                this.type = 'AMMO';
+            } else {
+                this.type = type;
+            }
         }
 
         this.mesh = this._createMesh();

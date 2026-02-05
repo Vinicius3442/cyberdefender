@@ -67,6 +67,12 @@ export class Player {
 
     _init() {
         this.camera.rotation.order = 'YXZ';
+        
+        // Spawn Protection
+        this.isInvulnerable = true;
+        this.invulnerabilityTimer = 3.0; // 3 seconds grace period on spawn
+        this.lastDamageTime = 0;
+        this.damageCooldown = 0.5; // Minimum 0.5s between hits from melee
 
         // Input callbacks
         this.input.onMouseMove = (dx, dy) => this._onMouseMove(dx, dy);
@@ -86,6 +92,15 @@ export class Player {
     }
 
     update(dt, isMoving) {
+        // Update Immunity
+        if (this.invulnerabilityTimer > 0) {
+            this.invulnerabilityTimer -= dt;
+            if (this.invulnerabilityTimer <= 0) {
+                this.isInvulnerable = false;
+                this.createFloatingText(this.position, "SYSTEM READY", "#00ff00");
+            }
+        }
+
         // Update Weapon Position (Bobbing)
         this._updateWeaponModel(dt, isMoving);
         
@@ -432,26 +447,48 @@ export class Player {
     }
 
     takeDamage(amount) {
+        if (this.isDead) return;
+        if (this.isInvulnerable) return; // Spawn protection
+        
+        // Cooldown check for rapid hits (unless amount is massive, e.g. explosion?)
+        // Let's enforce cooldown for ALL damage to stop instakills
+        const now = Date.now() / 1000;
+        if (now - this.lastDamageTime < this.damageCooldown) {
+            return;
+        }
+        this.lastDamageTime = now;
+
         this.hp -= amount;
         document.getElementById('hp-display').innerText = Math.floor(this.hp);
         
         // Red Flash Effect
-        const flash = document.createElement('div');
-        flash.style.position = 'absolute';
-        flash.style.top = '0';
-        flash.style.left = '0';
-        flash.style.width = '100%';
-        flash.style.height = '100%';
-        flash.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
-        flash.style.pointerEvents = 'none';
-        flash.style.zIndex = '999';
-        flash.style.transition = 'opacity 0.2s';
-        document.body.appendChild(flash);
-
-        setTimeout(() => {
+        // Red Flash Effect
+        let flash = document.getElementById('damage-flash');
+        if (!flash) {
+            flash = document.createElement('div');
+            flash.id = 'damage-flash';
+            flash.style.position = 'absolute';
+            flash.style.top = '0';
+            flash.style.left = '0';
+            flash.style.width = '100%';
+            flash.style.height = '100%';
+            flash.style.backgroundColor = 'red'; // Color managed by opacity
+            flash.style.pointerEvents = 'none';
+            flash.style.zIndex = '999';
             flash.style.opacity = '0';
-            setTimeout(() => flash.remove(), 200);
-        }, 50);
+            flash.style.transition = 'opacity 0.1s';
+            document.body.appendChild(flash);
+        }
+
+        // Trigger flash
+        flash.style.opacity = '0.2'; // Reduced from 0.4
+        
+        // Clear existing timeout if any (simple debounce)
+        if (this.flashTimeout) clearTimeout(this.flashTimeout);
+        
+        this.flashTimeout = setTimeout(() => {
+            flash.style.opacity = '0';
+        }, 100);
 
         if (this.hp <= 0) this.die();
     }
@@ -461,57 +498,75 @@ export class Player {
         this.isDead = true;
         document.exitPointerLock();
 
-        // 1. Trigger Shutdown Screen
-        const screen = document.getElementById('shutdown-screen');
-        const textContainer = document.getElementById('shutdown-text');
-        screen.style.display = 'flex';
-        screen.style.background = '#000'; // Pure black for "Power off" feel
+        // 1. Initial Glitch & Freeze
+        const hud = document.getElementById('ui-layer');
+        hud.style.animation = 'none'; // Stop normal flicker
         
-        const lines = [
-            "CRITICAL ERROR: SYSTEM FAILURE",
-            "LIFE SUPPORT... OFFLINE",
-            "WEAPON SYSTEMS... TERMINATED",
-            "INITIATING MEMORY DUMP...",
-            "...",
-            "SIGNAL LOST."
+        // Create Corruption Overlay if not exists
+        let corruption = document.getElementById('corruption-overlay');
+        if (!corruption) {
+            corruption = document.createElement('div');
+            corruption.id = 'corruption-overlay';
+            corruption.style.position = 'absolute';
+            corruption.style.top = '0'; corruption.style.left = '0';
+            corruption.style.width = '100%'; corruption.style.height = '100%';
+            corruption.style.zIndex = '4500';
+            corruption.style.pointerEvents = 'none';
+            corruption.style.display = 'none';
+            corruption.innerHTML = `
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:600px; font-family:'Courier New'; color:#f00; font-weight:bold; background:rgba(0,0,0,0.8); padding:20px; border: 2px solid #f00;">
+                    <div style="border-bottom:1px solid #f00; margin-bottom:10px;">SYSTEM DIAGNOSTIC TOOL v1.0</div>
+                    <div id="diag-list" style="text-align:left; font-size:14px; line-height:1.5;"></div>
+                </div>
+            `;
+            document.body.appendChild(corruption);
+        }
+        
+        corruption.style.display = 'block';
+        const diagList = document.getElementById('diag-list');
+        diagList.innerHTML = '';
+        
+        const systems = [
+            { name: "OPTICAL SENSORS", delay: 500 },
+            { name: "MOTOR FUNCTIONS", delay: 1000 },
+            { name: "WEAPON LINK", delay: 1500 },
+            { name: "LIFE SUPPORT", delay: 2000 },
+            { name: "CORE MEMORY", delay: 2500 }
         ];
         
-        // Typewriter Effect
-        let lineIndex = 0;
-        let charIndex = 0;
+        let currentTime = 0;
         
-        // Disable game loop interaction (managed by isDead flag)
+        systems.forEach((sys, i) => {
+            setTimeout(() => {
+                const line = document.createElement('div');
+                line.innerHTML = `Scanning ${sys.name}... <span style="color:#f00">CRITICAL FAILURE</span>`;
+                diagList.appendChild(line);
+                
+                // Audio hint check?
+                // Visual Glitch per failure
+                document.body.style.filter = `hue-rotate(${Math.random() * 360}deg) contrast(${1 + i * 0.5})`;
+                
+                if (i === systems.length - 1) {
+                    // Final Crash
+                    setTimeout(() => {
+                        corruption.style.display = 'none';
+                        document.body.style.filter = 'none';
+                        this.showGameOver();
+                    }, 1500);
+                }
+            }, sys.delay);
+        });
         
-        const typeLine = () => {
-             if (lineIndex >= lines.length) {
-                 // Sequence complete, show real game over
-                 setTimeout(() => {
-                     document.getElementById('game-over-screen').style.display = 'flex';
-                     screen.style.display = 'none'; // Hide terminal
-                 }, 1000);
-                 return;
-             }
-             
-             const currentLine = lines[lineIndex];
-             if (charIndex < currentLine.length) {
-                 textContainer.innerHTML = lines.slice(0, lineIndex).join('<br>') + '<br>' + currentLine.substring(0, charIndex + 1) + '<span class="cursor"></span>';
-                 charIndex++;
-                 setTimeout(typeLine, 30); // Typing speed
-             } else {
-                 lineIndex++;
-                 charIndex = 0;
-                 setTimeout(typeLine, 300); // Line pause
-             }
-        };
-        
-        typeLine();
-
-        document.getElementById('final-score').innerText = "SCORE: " + this.score;
-
-        // Submit Score to Leaderboard
+        // Submit Score
         if (window.submitScore) {
             window.submitScore(this.score);
         }
+    }
+
+    showGameOver() {
+         const screen = document.getElementById('game-over-screen');
+         screen.style.display = 'flex';
+         document.getElementById('final-score').innerText = "SCORE: " + this.score;
     }
 
     addAmmoToAll(percent) {

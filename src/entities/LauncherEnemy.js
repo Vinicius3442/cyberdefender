@@ -8,75 +8,115 @@ export class LauncherEnemy extends Enemy {
         this.projectiles = projectiles;
         
         this.hp = 80; // Medium tanky
-        this.speed = 2.0; // Slow
+        this.speed = 1.8; // Slow
         this.attackRange = 30;
-        this.attackCooldown = 4.0; // Very slow fire
+        this.attackCooldown = 4.0; 
         this.attackTimer = 0;
-        this.lastAttackTime = 0;
+        
+        // Parts
+        // Parts - initialized in _createMesh
+        // this.torsoMesh = null;
+        // this.launchers = [];
     }
 
     _createMesh() {
         const group = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({ color: 0x444488 }); // Blueish Metal
-
-        // Track base (Legs)
-        const trackL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.6), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-        trackL.position.set(-0.35, 0.1, 0); group.add(trackL);
-        const trackR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.6), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-        trackR.position.set(0.35, 0.1, 0); group.add(trackR);
-
-        // Torso
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.5), mat);
-        torso.position.y = 0.5;
-        group.add(torso);
-
-        // Shoulder Cannons (Launchers)
-        const tubeGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 0.7 }); // Dark Blue
+        const trackMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
         
-        const leftTube = new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-        leftTube.rotation.x = Math.PI / 2;
-        leftTube.position.set(-0.4, 0.8, -0.2);
-        group.add(leftTube);
-
-        const rightTube = new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-        rightTube.rotation.x = Math.PI / 2;
-        rightTube.position.set(0.4, 0.8, -0.2);
-        group.add(rightTube);
+        // Base (Tracks)
+        const leftTrack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.8), trackMat);
+        leftTrack.position.set(-0.4, 0.2, 0);
+        group.add(leftTrack);
+        
+        const rightTrack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.8), trackMat);
+        rightTrack.position.set(0.4, 0.2, 0);
+        group.add(rightTrack);
+        
+        // Torso
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.6), mat);
+        torso.position.y = 0.8;
+        group.add(torso);
+        this.torsoMesh = torso;
+        
+        // Head / Cockpit
+        const cockpit = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), new THREE.MeshStandardMaterial({ color: 0x88ccff, metalness: 0.9, roughness: 0.2 }));
+        cockpit.position.set(0, 1.25, 0.1);
+        group.add(cockpit);
+        
+        // Missile Pods
+        this.launchers = [];
+        const offsets = [-0.6, 0.6];
+        offsets.forEach(x => {
+            const podGroup = new THREE.Group();
+            podGroup.position.set(x, 1.0, -0.2);
+            
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.6), mat);
+            podGroup.add(box);
+            
+            // Tubes
+            for(let i=0; i<4; i++) {
+                const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+                tube.rotation.x = Math.PI / 2;
+                tube.position.set((i%2)*0.15 - 0.075, (Math.floor(i/2))*0.15 - 0.075, 0.3);
+                podGroup.add(tube);
+            }
+            
+            group.add(podGroup);
+            this.launchers.push(podGroup);
+        });
 
         group.scale.set(1.5, 1.5, 1.5);
         return group;
     }
 
     update(dt, playerPosition) {
-        if (this.isDead) return;
+        super.update(dt, playerPosition); // Animations
+        if (this.isDead && !this.playingDeathAnim) return;
 
-        // Keep distance
         const dist = this.mesh.position.distanceTo(playerPosition);
         this.mesh.lookAt(playerPosition.x, this.mesh.position.y, playerPosition.z);
+        this.updateGroundPosition();
+        
+        if (this.isDead && this.playingDeathAnim) return;
 
+        // AI Logic
         if (dist < 10) {
             // Back away
-            const direction = new THREE.Vector3()
-                .subVectors(this.mesh.position, playerPosition)
-                .normalize();
+            const direction = new THREE.Vector3().subVectors(this.mesh.position, playerPosition).normalize();
             direction.y = 0;
             this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
         } else if (dist > 20) {
-            // Move closer
-            const direction = new THREE.Vector3()
-                .subVectors(playerPosition, this.mesh.position)
-                .normalize();
+            // Approach
+            const direction = new THREE.Vector3().subVectors(playerPosition, this.mesh.position).normalize();
             direction.y = 0;
             this.mesh.position.add(direction.multiplyScalar(this.speed * dt));
         }
-
-        // Clamp to ground
-        this.updateGroundPosition();
-
+        
+        // Fire Logic
         this.attackTimer -= dt;
         if (this.attackTimer <= 0) {
             this.shoot(playerPosition);
+            this.playAnimation('attack');
             this.attackTimer = this.attackCooldown;
+        }
+    }
+    
+    animAttack(t) {
+        // Recoil Pods
+        if (t < 0.2) {
+            this.launchers.forEach(p => p.rotation.x = -0.5);
+        } else {
+            this.launchers.forEach(p => p.rotation.x = THREE.MathUtils.lerp(p.rotation.x, 0, 0.1));
+            if (t > 1.0) this.currentAnim = null;
+        }
+    }
+    
+    animDie(t) {
+        // Fall back
+        if (t < 1.0) {
+            this.mesh.rotation.x = -Math.PI / 2 * t;
+            this.mesh.position.y -= 0.5 * t;
         }
     }
 
@@ -85,15 +125,18 @@ export class LauncherEnemy extends Enemy {
             .subVectors(targetPos, this.mesh.position)
             .normalize();
 
-        const spawnPos = this.mesh.position.clone().add(direction.clone().multiplyScalar(1.5));
-        spawnPos.y += 0.5;
+        // Fire from alternating pods? Both for now.
+        const spawnPos = this.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)); // Center top
+        spawnPos.add(direction.clone().multiplyScalar(1.0));
 
         const projectile = new Projectile(spawnPos, direction, false);
         projectile.isExplosive = true;
-        projectile.explosionRadius = 3.0;
+        projectile.explosionRadius = 4.0;
         projectile.damage = 30;
-        projectile.mesh.scale.set(2, 2, 2); // Big rocket
-
+        projectile.mesh.scale.set(2, 2, 2); 
+        // Visuals
+        projectile.mesh.material = new THREE.MeshStandardMaterial({ color: 0xffff00 }); // Yellow Warhead
+        
         this.scene.add(projectile.mesh);
         this.projectiles.push(projectile);
     }

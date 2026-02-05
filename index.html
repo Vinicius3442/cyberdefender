@@ -25,14 +25,57 @@
 
     <div id="ui-layer">
         <div id="crosshair"></div>
-        <div id="hud">
-            <div class="hud-item">WAVE: <span id="wave-display">1</span></div>
-            <div class="hud-item">SCORE: <span id="score-display">0</span></div>
-            <div class="hud-item">HP: <span id="hp-display">100</span></div>
-            <div class="hud-item">WEAPON: <span id="weapon-display">Pistol</span></div>
-            <div class="hud-item" id="ammo-container">AMMO: <span id="ammo-display">∞</span></div>
-            
+        <div id="hud-grid">
+            <!-- Bottom Left: System Status -->
+            <div id="hud-system" class="hud-panel">
+                <div class="panel-header">SYSTEM STATUS</div>
+                <div class="status-row">
+                    <span class="label">INTEGRITY</span>
+                    <div class="bar-container">
+                        <div id="hp-bar-fill" style="width: 100%;"></div>
+                    </div>
+                    <span id="hp-display" class="value">100</span>
+                </div>
+                <div class="status-row">
+                    <span class="label">ARMOR</span>
+                    <div class="bar-container armor">
+                        <div id="armor-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <span id="armor-display" class="value">0</span>
+                </div>
+            </div>
 
+            <!-- Bottom Center: Notifications/Mission -->
+            <div id="hud-center" class="hud-panel minimal">
+                <div id="wave-display-container">
+                    <span class="label">WAVE DETECTED</span>
+                    <span id="wave-display" class="value large">1</span>
+                </div>
+                <div id="score-container">
+                    <span class="label">DATA COLLECTED</span>
+                    <span id="score-display">0</span>
+                </div>
+            </div>
+
+            <!-- Bottom Right: Weapons & Radar -->
+            <div id="hud-weapons" class="hud-panel">
+                <div class="panel-header">WEAPON SYSTEMS</div>
+                <div class="weapon-info">
+                    <div class="ammo-group">
+                        <span id="ammo-display" class="value huge">∞</span>
+                        <span class="label">ROUNDS</span>
+                    </div>
+                    <div class="weapon-name-group">
+                        <span id="weapon-display" class="value">PISTOL</span>
+                        <span class="label">EQUIPPED</span>
+                    </div>
+                </div>
+                <!-- Radar Canvas -->
+                <div id="radar-container">
+                    <canvas id="radar-canvas" width="150" height="150"></canvas>
+                    <div class="radar-overlay"></div>
+                </div>
+            </div>
         </div>
 
         <div id="boss-container" style="display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); width: 600px; text-align: center;">
@@ -51,53 +94,33 @@
             <div id="wave-progress-text">NEXT WAVE</div>
         </div>
 
-        <!-- MAIN MENU -->
-        <div id="start-screen">
-            <!-- Left: Controls -->
-            <div class="menu-left">
-                <h1 class="game-title">CYBER FPS</h1>
+        <!-- ARTISTIC SHELL MENU -->
+        <div id="robot-face-container">
+            <h1 id="game-title">CYBER PROTOCOL</h1>
+            <canvas id="robot-face-canvas"></canvas>
+            <div id="face-hint" style="position: absolute; bottom: 50px; width: 100%; text-align: center; font-family: 'Courier New'; color: #0f0; opacity: 0; transition: opacity 2s;">[ CLICK TO WAKE ]</div>
+        </div>
 
-                <div class="input-group">
-                    <label>CODENAME</label>
-                    <input type="text" id="player-name" placeholder="ENTER NAME" value="Soldier" maxlength="12">
+        <div id="shell-container" style="display: none;">
+            <div class="monitor-screen">
+                <div class="terminal-body" id="shell-output">
+                    <!-- Neofetch content goes here -->
                 </div>
-
-                <div class="input-group">
-                    <label>SKIN UPLOAD (PNG)</label>
-                    <input type="file" id="player-skin" accept="image/png">
+                <div class="input-line">
+                    <span class="prompt">guest@cyber-os:~$</span>
+                    <input type="text" id="shell-input" autocomplete="off" spellcheck="false" autofocus>
                 </div>
-
-                <div class="button-group">
-                    <button id="btn-play" class="menu-btn primary">DEPLOY</button>
-                    <!-- <button id="btn-config" class="menu-btn">SETTINGS</button> -->
-                </div>
-
-                <div style="font-size: 12px; color: #666; margin-top: 20px;">
-                    WASD: Move | R: Reload | P: Pause<br>
-                    Goal: Survive & Reach the Top 10
-                </div>
-            </div>
-
-            <!-- Center: Champion -->
-            <div class="menu-center">
-                <div id="champion-display">
-                    <!-- Champion Image injected via JS -->
-                    <span style="color: #444; font-size: 14px;">NO CHAMPION YET</span>
-                </div>
-                <div class="champion-label">CURRENT #1 CHAMPION</div>
-            </div>
-
-            <!-- Right: Leaderboard -->
-            <div class="menu-right">
-                <div class="leaderboard-title">GLOBAL RANKING</div>
-                <ul id="leaderboard-list">
-                    <li class="loading-text">CONNECTING TO SERVER...</li>
-                </ul>
             </div>
         </div>
 
         <div id="boot-sequence" style="display: none;">
             <div id="boot-text"></div>
+        </div>
+        
+        <!-- Shutters for wake-up anim -->
+        <div id="shutters" class="shutters">
+            <div class="shutter-top"></div>
+            <div class="shutter-bottom"></div>
         </div>
 
         <div id="inventory-menu" style="display: none;">
