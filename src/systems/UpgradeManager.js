@@ -99,11 +99,6 @@ export class UpgradeManager {
     }
 
     generateOptions() {
-        // Define all upgradeable stats
-        // We can pick 3 random ones OR list all fixed ones?
-        // User asked for "stats on right". Let's show fixed stats that can be upgraded.
-        // HP, Speed, Jump, Max Ammo (for all weapons?), Reload Speed?
-        
         const definitions = [
             { 
                 id: 'hp', title: 'MAX HEALTH', 

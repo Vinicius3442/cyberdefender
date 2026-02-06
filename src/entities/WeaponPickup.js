@@ -3,10 +3,11 @@ import { WeaponType } from '../core/WeaponSystem.js';
 import { WeaponFactory } from '../core/WeaponFactory.js';
 
 export class WeaponPickup {
-    constructor(scene, position, type = 'RANDOM') {
+    constructor(scene, position, type = 'RANDOM', cooldown = 0) {
         this.scene = scene;
         this.position = position.clone();
-        this.shouldRemove = false; // Keep existing property
+        this.shouldRemove = false; 
+        this.pickupCooldown = cooldown; // Time before it can be picked up
 
         // Decide type if RANDOM
         if (type === 'RANDOM' || !type) {
@@ -80,6 +81,7 @@ export class WeaponPickup {
     }
 
     update(dt, playerPos) {
+        if (this.pickupCooldown > 0) this.pickupCooldown -= dt;
         this.lifeTime += dt;
         
         // Blink near end
@@ -103,7 +105,9 @@ export class WeaponPickup {
         this.mesh.position.y = groundH + 1.0 + Math.sin(Date.now() * 0.003) * 0.2;
 
         if (this.mesh.position.distanceTo(playerPos) < this.radius) {
-            return true; // Picked up
+            if (this.pickupCooldown <= 0) {
+                return true; // Picked up
+            }
         }
         return false;
     }

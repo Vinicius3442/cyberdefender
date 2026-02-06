@@ -54,18 +54,6 @@ export class RemotePlayer {
         screen.position.set(0, 0.02, 0.226); // Slightly protruding from housing front (0.225)
         headGroup.add(screen);
 
-        // 3. Screen Gloss/Glass Layer (Optional, adds "Tube" feel)
-        /*
-        const glassGeo = new THREE.PlaneGeometry(0.35, 0.3);
-        const glassMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff, opacity: 0.2, transparent: true, roughness: 0.1, metalness: 0.9 
-        });
-        const glass = new THREE.Mesh(glassGeo, glassMat);
-        glass.position.set(0, 0.02, 0.23); 
-        headGroup.add(glass);
-        */
-
-        // Legs
         const legGeo = new THREE.BoxGeometry(0.15, 0.7, 0.2);
         const leftLeg = new THREE.Mesh(legGeo, matMetalLight);
         leftLeg.position.set(-0.15, 0.35, 0);

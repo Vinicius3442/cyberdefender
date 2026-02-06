@@ -7,8 +7,6 @@ import { ShellMenu } from './ui/ShellMenu.js';
 const LEADERBOARD_API = 'http://localhost:3001/api/leaderboard';
 const SCORE_API = 'http://localhost:3001/api/score';
 
-// DOM Elements
-// DOM Elements
 const startScreen = document.getElementById('start-screen');
 const btnPlay = document.getElementById('btn-play');
 const btnResume = document.getElementById('btn-resume');
@@ -17,23 +15,51 @@ const leaderboardList = document.getElementById('leaderboard-list');
 const championDisplay = document.getElementById('champion-display');
 
 let gameInstance = null;
-// let playerSkinURL = null; // Removed
-
-// --- skin loading ---
-// Removed
-
-// Track Mouse globally for menu effects
 window.mousePos = { x: 0, y: 0 };
+let lastMousePos = { x: 0, y: 0 };
+let shakeVelocity = 0;
+
 document.addEventListener('mousemove', (e) => {
+    // Calculate instantaneous velocity
+    const dx = e.clientX - lastMousePos.x;
+    const dy = e.clientY - lastMousePos.y;
+    const speed = Math.sqrt(dx*dx + dy*dy);
+    
+    // Smooth accumulation (Dizziness)
+    shakeVelocity = speed * 0.05; // Much Lower Sensitivity
+    
     window.mousePos.x = e.clientX;
     window.mousePos.y = e.clientY;
+    lastMousePos.x = e.clientX;
+    lastMousePos.y = e.clientY;
 });
 
-// --- 3D Champion Display ---
-// Logic moved to ShellMenu / Neofetch (Text only for now) or removed.
-// The old DOM elements #leaderboard-list and #champion-display do not exist.
+// Menu Loop (Dizziness visual)
+const menuLoop = () => {
+    if (!gameInstance) {
+        shakeVelocity *= 0.9; // Decay
+        
+        const faceContainer = document.getElementById('robot-face-container');
+        if (faceContainer) {
+            // Apply blur and rotation based on shake
+            // Increased threshold to 5 so it requires real shaking
+            if (shakeVelocity > 5) {
+                const blur = Math.min(shakeVelocity * 0.05, 5);
+                const rot = Math.min(shakeVelocity * 0.1, 3);
+                const skew = Math.min(shakeVelocity * 0.05, 1);
+                
+                faceContainer.style.filter = `blur(${blur}px)`;
+                faceContainer.style.transform = `scale(${1 + blur*0.01}) rotate(${rot * (Math.random()-0.5)}deg) skewX(${skew}deg)`;
+            } else {
+                faceContainer.style.filter = 'none';
+                faceContainer.style.transform = 'none';
+            }
+        }
+    }
+    requestAnimationFrame(menuLoop);
+};
+menuLoop();
 
-// Initialize Shell Menu
 const startShell = () => {
     const shellMenu = new ShellMenu((name, mode) => {
         // Callback when 'game start' is run (after Boot Sequence inside ShellMenu)
@@ -41,12 +67,7 @@ const startShell = () => {
     });
 };
 
-// Start directly with Shell
 startShell();
-
-// Remove old listeners
-// btnPlay.addEventListener... removed
-// inputSkin etc handled by ShellMenu
 
 if (btnResume) {
     btnResume.addEventListener('click', () => {
@@ -56,7 +77,7 @@ if (btnResume) {
     });
 }
 
-const startGame = (playerName, mode = 'SP') => {
+const startGame = (playerName, mode = 'SP', options = {}) => {
     // Lock Pointer
     document.body.requestPointerLock();
 
@@ -79,18 +100,25 @@ const startGame = (playerName, mode = 'SP') => {
     // Start Game
     if (!gameInstance) {
         // Create Game
-        gameInstance = new Game(mode, { name: playerName, skin: null });
+        // If mode is CASTLE, we start as SP but trigger level load
+        const actualMode = (mode === 'CASTLE') ? 'SP' : mode;
+        
+        gameInstance = new Game(actualMode, { name: playerName, skin: null, ...options });
         
         // Start Loop - EXPLICIT CALL REQUIRED NOW
         gameInstance.animate();
+        
+        // Immediate Level Load
+        if (mode === 'CASTLE') {
+            console.log("MAIN: Fast-forwarding to CASTLE Level...");
+            // Small delay to ensure init
+            setTimeout(() => {
+                gameInstance.loadLevel('CASTLE');
+            }, 100);
+        }
     }
 };
 
-// Initial Load
-// ShellMenu handles its own data fetching when 'fetch' command is used.
-// We do not need a loop here anymore.
-
-// Export for internal use (Game Over submission)
 window.submitScore = async (score) => {
     const name = (gameInstance && gameInstance.player && gameInstance.player.name) || "Soldier";
     const statusMsg = document.getElementById('submission-status');

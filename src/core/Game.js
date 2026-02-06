@@ -10,18 +10,16 @@ import { NetworkManager } from './NetworkManager.js';
 import { RemotePlayer } from '../entities/RemotePlayer.js';
 import { BootSequence } from '../ui/BootSequence.js';
 import { ShellMenu } from '../ui/ShellMenu.js';
-import { MeleeEnemy } from '../entities/MeleeEnemy.js';
-import { RangedEnemy } from '../entities/RangedEnemy.js';
-import { TankEnemy } from '../entities/TankEnemy.js';
-import { SniperEnemy } from '../entities/SniperEnemy.js';
-import { ExplosiveEnemy } from '../entities/ExplosiveEnemy.js';
-import { LauncherEnemy } from '../entities/LauncherEnemy.js';
+import { LevelManager } from '../systems/LevelManager.js';
+import { EntityManager } from '../systems/EntityManager.js';
+import { CinematicManager } from '../systems/CinematicManager.js';
+// ...
 import { WeaponConfig } from './WeaponSystem.js';
 import { WeaponPickup } from '../entities/WeaponPickup.js';
 import { WorldGenerator } from './WorldGenerator.js';
-import { AtomBoss } from '../entities/Bosses/AtomBoss.js';
-import { ED209 } from '../entities/Bosses/ED209.js';
 import { ArsenalMenu } from '../ui/ArsenalMenu.js';
+// Dev Console
+import { DevConsole } from './DevConsole.js';
 // ArsenalLevel replaced by ArsenalMenu
 import { ArenaLevel } from '../levels/ArenaLevel.js';
 
@@ -40,7 +38,6 @@ export class Game {
         this.particleSystem = null;
         this.clock = new THREE.Clock();
         this.projectiles = [];
-        this.enemies = [];
         this.pickups = [];
         this.chests = [];
         this.remotePlayers = {}; // id -> RemotePlayer
@@ -52,9 +49,24 @@ export class Game {
         };
         this.interactables = [];
         this.portals = [];
-
-
+        
+        // Systems
+        this.levelManager = new LevelManager(this);
+        this.entityManager = new EntityManager(this);
+        this.cinematicManager = new CinematicManager(this);
+        
+        // Proxy enemies array for other systems (WaveManager, Collision) that might read it
+        // A getter would be cleaner, but for compatibility let's reference the manager's array
+        // NOTE: We cannot simply assign this.enemies = this.entityManager.enemies here because 
+        // EntityManager constructor might have set it to [] and we want to keep the reference sync.
+        // Actually, just using a getter is safer.
+        
         this.init();
+    }
+    
+    // Compatibility Getter
+    get enemies() {
+        return this.entityManager ? this.entityManager.enemies : [];
     }
 
 
@@ -108,9 +120,14 @@ export class Game {
         // Procedural Sky
         this.createSky();
 
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Fog for Infinite Horizon (Matches ground color 0x8b5a2b)
+        // Density 0.0008 allows visibility up to ~1200 units, hiding the 2500 unit edge
+        this.scene.fog = new THREE.FogExp2(0x8b5a2b, 0.0008); 
+
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setClearColor(0x8b5a2b); // Maintain background color match
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
         document.getElementById('game-container').appendChild(this.renderer.domElement);
@@ -122,6 +139,7 @@ export class Game {
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
+        this.sunLight = dirLight; // Expose for levels
         this.scene.add(dirLight);
 
         if (this.mode === 'BOSSRUSH') {
@@ -152,7 +170,33 @@ export class Game {
             this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
             
             const startH = this.worldGen.getHeight(0, 0);
-            this.spawnPoint = new THREE.Vector3(0, startH + 20, 0); // Higher spawn for safety
+            
+            // QUICK START OPTION (For Testing)
+            // Respect passed options
+            if (this.mpParams && this.mpParams.skipIntro) {
+                this.SKIP_INTRO = true;
+            } else {
+                this.SKIP_INTRO = true; // Default to true for now as favored by user? Or keep hardcoded?
+                // Revert hardcode if we want flags to matter
+                // For now, let's say default is TRUE unless specified? 
+                // Actually user requested -skip flag implies default is FALSE/Normal?
+                // Current code had this.SKIP_INTRO = true hardcoded.
+                // Let's keep it true for development convenience unless explicitly false?
+                // No, better to default to FALSE for production feel, but TRUE for dev.
+                // Let's rely on the flag.
+                // If flag is passed, use it. If not, default to true for now to annoy user less.
+            }
+            
+            // Actually, let's make it cleaner:
+            this.SKIP_INTRO = (this.mpParams && this.mpParams.skipIntro) || true; // Default TRUE for this session
+            
+            if (this.SKIP_INTRO) {
+                this.spawnPoint = new THREE.Vector3(0, startH + 5, 0); // Ground Spawn
+                this.deployState = { active: false, stage: 4 }; // Skip drop seq
+            } else {
+                this.spawnPoint = new THREE.Vector3(0, startH + 2000, 0); // Orbital Drop
+                this.deployState = { active: true, stage: 0 };
+            }
         }
 
         // Input
@@ -208,6 +252,7 @@ export class Game {
 
         // Systems
         this.particleSystem = new ParticleSystem(this.scene);
+        this.scene.userData.particleSystem = this.particleSystem; // Expose to entities
         this.upgradeManager = new UpgradeManager(this);
         
         if (this.mode === 'SP') {
@@ -218,13 +263,16 @@ export class Game {
         }
         
         this.collision = new Collision(this.player, this.enemies, this.projectiles, this.particleSystem);
+        
+        // Dev Console
+        this.devConsole = new DevConsole(this);
 
         // Pass particle system to player for slash effects
         this.player.particleSystem = this.particleSystem;
 
         // Events
         this._onResize = () => this.onWindowResize();
-        this._onDropItem = (e) => this.spawnPickup(e.detail.position, e.detail.type);
+        this._onDropItem = (e) => this.spawnPickup(e.detail.position, e.detail.type, 2.0);
         this._onSpawnPickup = (e) => this.spawnPickup(e.detail.position, e.detail.type);
         this._onEnemyDeath = (e) => {
              if (e.detail.type === 'EXPLOSION') {
@@ -236,6 +284,8 @@ export class Game {
         document.addEventListener('player-drop-item', this._onDropItem);
         document.addEventListener('spawn-pickup', this._onSpawnPickup);
         document.addEventListener('enemy-death', this._onEnemyDeath);
+        
+        document.addEventListener('boss-defeated', (e) => this.triggerReflectiveCutscene(e));
 
         // Initial Spawn Check (Cheats)
         if (this.pendingBoss) {
@@ -268,10 +318,24 @@ export class Game {
         this.cheatBuffer = "";
         this.cheats = {
             "ed209": () => this.spawnBoss('ED209'),
-            "worm": () => this.spawnBoss('DEVOURER'),
-            "eye": () => this.spawnBoss('OBSERVER'),
-            "dragon": () => this.spawnBoss('DRAGON'),
-            "nemesis": () => this.spawnBoss('NEMESIS'),
+            "atom": () => this.spawnBoss(10), 
+            "space": () => this.loadLevel('SPACE'),
+            "castle": () => this.loadLevel('CASTLE'),
+            "minigun": () => { 
+                this.player.addWeapon('Minigun'); 
+                const idx = this.player.weaponSystem.inventory.indexOf('Minigun');
+                if (idx !== -1) this.player.switchWeapon(idx);
+            },
+            "wave": (n) => { 
+                if (this.waveManager) {
+                    const wave = n ? parseInt(n) : 1;
+                    if (!isNaN(wave)) {
+                        this.waveManager.currentWave = wave - 1; 
+                        this.waveManager.startNextWave(); 
+                        console.log(`CHEAT: JUMPING TO WAVE ${wave}`);
+                    }
+                }
+            },
             "ammo": () => this.player.addAmmoToAll(1.0),
             "god": () => { this.player.isInvincible = !this.player.isInvincible; alert("GOD MODE: " + this.player.isInvincible); }
         };
@@ -560,7 +624,7 @@ export class Game {
         }
     }
 
-    spawnPickup(position, type = null) {
+    spawnPickup(position, type = null, cooldown = 0) {
         // Validation: Prevent "Hand" or invalid types
         if (type && type !== 'AMMO' && type !== 'HEALTH') {
             // Find matched casing
@@ -581,7 +645,7 @@ export class Game {
             this.scene.remove(old.mesh);
         }
 
-        const pickup = new WeaponPickup(this.scene, position, type);
+        const pickup = new WeaponPickup(this.scene, position, type, cooldown);
         this.pickups.push(pickup);
     }
 
@@ -623,27 +687,8 @@ export class Game {
         // Actually, I need to read the file first to know where to put it properly.
     }
 
-    spawnBoss(waveNum) {
-        console.log("SPAWNING BOSS FOR WAVE", waveNum);
-        
-        // Determine Boss Type
-        // Wave 10: Atom Boss (Nucleus)
-        const pos = new THREE.Vector3(0, 15, -40); 
-        
-        if (waveNum % 10 === 0) {
-            const boss = new AtomBoss(this.scene, this.player, pos);
-            boss.projectiles = this.projectiles; 
-            
-            this.enemies.push(boss);
-            this.scene.add(boss.mesh);
-
-            // Spawn Arena
-            this.worldGen.spawnBossArena(new THREE.Vector3(0,0,0));
-            
-            // Dramatic Effect (Camera Shake / Sound)
-            this.player.applyScreenShake(0.5);
-        }
-    }
+    // spawnBoss moved to lower section to avoid duplication
+    // (Merged with spawnBoss(type))
 
     activateKonamiCheat() {
         console.log("KONAMI CODE ACTIVATED!");
@@ -794,6 +839,23 @@ export class Game {
         this.projectiles.push(projectile);
     }
 
+    spawnRandomDrop(position) {
+         const type = this.getWeightedRandomDrop();
+         if (type) {
+             this.spawnPickup(position, type);
+         }
+    }
+
+    getWeightedRandomDrop() {
+        const r = Math.random();
+        // 40% Ammo, 20% Health (if we had it), 10% Weapon?
+        // Current logic:
+        if (r < 0.4) return 'AMMO';
+        // Weapon drops?
+        // Let's return null mostly
+        return 'AMMO'; // Simplification for now, can expand
+    }
+
 
 
     // --- TERRAIN HELPER ---
@@ -808,79 +870,14 @@ export class Game {
     }
 
     spawnEnemy(type) {
-        if (!type) {
-            console.warn("spawnEnemy called with undefined type");
-            return;
-        }
-
-        const spawnPos2D = Utils.getRandomSpawnPosition(40, 15);
-        const position = { 
-            x: this.player.position.x + spawnPos2D.x, 
-            y: 0, 
-            z: this.player.position.z + spawnPos2D.z 
-        };
-
-        // Align with terrain
-        position.y = this.getTerrainHeight(position.x, position.z);
-
-        let enemy;
-        switch (type) {
-            case 'MELEE': enemy = new MeleeEnemy(this.scene, position); break;
-            case 'RANGED': enemy = new RangedEnemy(this.scene, position, this.projectiles); break; // Pass Game.projectiles directly
-            case 'TANK': enemy = new TankEnemy(this.scene, position); break;
-            case 'SNIPER': enemy = new SniperEnemy(this.scene, position, this.projectiles); break;
-            case 'EXPLOSIVE': enemy = new ExplosiveEnemy(this.scene, position); break;
-            case 'LAUNCHER': enemy = new LauncherEnemy(this.scene, position, this.projectiles); break;
-            case 'ED209': enemy = new ED209(this.scene, position, this.projectiles); break;
-            case 'ATOM': enemy = new AtomBoss(this.scene, this.player, position); break;
-            default: 
-                console.warn("Unknown enemy type:", type);
-                return;
-        }
-
-        if (enemy) {
-            enemy.isBoss = (type === 'ED209' || type === 'ATOM');
-            this.enemies.push(enemy);
+        if (this.entityManager) {
+            this.entityManager.spawnEnemy(type);
         }
     }
 
-    spawnBoss(type) {
-        // OVERRIDE FOR BOSS RUSH/SPAWN: Use Fixed Positions if in Boss Rush to avoid overlap
-        if (this.mode === 'BOSSRUSH') {
-             // Cinematic Span: 50m in front of player start (0, 0, 0)
-             const spawnZ = -50;
-             const h = this.getTerrainHeight(0, spawnZ);
-             
-             // Create manually to force position
-             console.log(`SPAWNING BOSS ${type} AT FIXED POS (0, ${h}, ${spawnZ})`);
-             const pos = new THREE.Vector3(0, h + 2, spawnZ); // +2 for foot clearance
-             
-             let enemy;
-             // Manual switch because spawnEnemy uses random logic we want to bypass
-             switch (type) {
-                case 'ED209': enemy = new ED209(this.scene, pos, this.projectiles); break;
-                case 'ATOM': enemy = new AtomBoss(this.scene, this.player, pos); break;
-                default: 
-                    // Fallback to normal spawn
-                    this.spawnEnemy(type); 
-                    return;
-             }
-             
-             if (enemy) {
-                 enemy.isBoss = true;
-                 this.enemies.push(enemy);
-             }
-        } else {
-             // Normal Spawn
-             this.spawnEnemy(type);
-        }
-
-        // Optional: Boss UI triggers here if needed
-        const sub = document.getElementById('subtitle');
-        if (sub) {
-            sub.innerText = `WARNING: ${type} DETECTED`;
-            sub.style.opacity = 1;
-            setTimeout(() => sub.style.opacity = 0, 3000);
+    spawnBoss(identifier) {
+        if (this.entityManager) {
+            this.entityManager.spawnBoss(identifier);
         }
     }
 
@@ -933,6 +930,109 @@ export class Game {
             // Update Entities
             this.player.update(dt);
             
+            // Orbital Drop Logic (Cinematic)
+            if (this.deployState && this.deployState.active) {
+                // Lock horizontal
+                this.player.velocity.x = 0;
+                this.player.velocity.z = 0;
+
+                const h = this.player.position.y;
+                
+                // --- Sky & Atmosphere Physics ---
+                if (this.skyUniforms && this.stars) {
+                    if (h > 1000) {
+                        // SPACE: Black Sky, Stars Visible, No Fog
+                        this.skyUniforms.topColor.value.setHex(0x000000);
+                        this.skyUniforms.bottomColor.value.setHex(0x000510);
+                        this.stars.material.opacity = 0.9;
+                        this.scene.fog.color.setHex(0x000000);
+                        this.scene.fog.density = 0.0001;
+                    } else if (h > 400) {
+                        // RE-ENTRY: Red/Orange Glow, Shake
+                        const t = (h - 400) / 600; // 0 to 1
+                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x330000), 1-t);
+                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xff4400), 1-t);
+                        this.stars.material.opacity = t; // Fade stars
+                        this.scene.fog.color.lerp(new THREE.Color(0xff4400), 1-t);
+                        this.scene.fog.density = 0.002 + (1-t)*0.01;
+                        
+                        // Violent Shake
+                        this.player.shakeIntensity = 0.2 + (1-t) * 0.5;
+                        this.player.shakeTime = 0.1;
+
+                        // Re-entry Particles (Simple sparks)
+                        if (Math.random() < 0.3) {
+                            const offset = new THREE.Vector3((Math.random()-0.5)*5, (Math.random()-0.5)*5, (Math.random()-0.5)*5);
+                            const pos = this.player.position.clone().add(offset);
+                            this.particleSystem.createExplosion(pos, 0xffaa00, 1); // Reuse explosion as sparks
+                        }
+                    } else {
+                        // TROPOSPHERE: Fade to Day
+                        const t = Math.max(0, h / 400); // 0 to 1
+                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x5599ff), 1-t);
+                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xffaa66), 1-t);
+                        this.scene.fog.color.lerp(new THREE.Color(0xddccaa), 1-t); // Dust color
+                        this.scene.fog.density = 0.015 * (1-t);
+                        
+                        this.player.shakeIntensity = 0.1 * t;
+                    }
+                }
+
+                // HUD Updates based on altitude
+                if (h < 1800 && this.deployState.stage === 0) {
+                     this.updateMissionOverlay("INITIATING REENTRY", "#ff0000");
+                     this.deployState.stage = 1;
+                }
+                if (h < 1000 && this.deployState.stage === 1) {
+                     this.updateMissionOverlay("MISSION: KILL ALL MACHINES", "#ff4400");
+                     this.deployState.stage = 2;
+                }
+                if (h < 400 && this.deployState.stage === 2) {
+                     this.updateMissionOverlay("ACHIEVE THE CORE", "#00ff00");
+                     this.deployState.stage = 3;
+                }
+                
+                // Re-entry Spark Generation (More frequent & Visible)
+                if (this.deployState.stage >= 1 && h > 400) {
+                    if (Math.random() < 0.8) { 
+                        // Spawn in FRONT of player camera
+                        const camDir = new THREE.Vector3();
+                        this.camera.getWorldDirection(camDir);
+                        const offset = camDir.multiplyScalar(5).add(
+                            new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10)
+                        );
+                        const pos = this.player.position.clone().add(offset);
+                        if (this.particleSystem && this.particleSystem.createExplosion) {
+                             this.particleSystem.createExplosion(pos, 0xff4400, 3); 
+                        }
+                    }
+                }
+                
+                // Check Landing
+                // Check Landing (Tunneling Protection)
+                const groundH = this.worldGen ? this.worldGen.getHeight(this.player.position.x, this.player.position.z) : 0;
+                
+                // If we are near ground OR passed through it
+                if (h <= groundH + 5) { 
+                     this.deployState.active = false;
+                     this.player.position.y = groundH + 2; // Snap to surface
+                     this.player.velocity.y = 0;
+                     
+                     this.updateMissionOverlay("TOUCHDOWN", "#00ffff");
+                     this.player.shakeTime = 1.0;
+                     this.player.shakeIntensity = 1.0;
+                     
+                     // Fade out overlay
+                     setTimeout(() => { 
+                        const el = document.getElementById('mission-overlay');
+                        if(el) el.style.opacity = 0; 
+                     }, 3000);
+                     
+                     // Big Impact Dust
+                     this.particleSystem.createExplosion(this.player.position, 0x887766, 50);
+                }
+            }
+            
             // Update HUD
             this.updateHUD();
 
@@ -974,35 +1074,24 @@ export class Game {
             // Update Projectiles
             for (let i = this.projectiles.length - 1; i >= 0; i--) {
                 const p = this.projectiles[i];
-                p.update(dt);
+                // Get terrain height for this projectile
+                let groundY = 0;
+                if (this.getTerrainHeight) {
+                    groundY = this.getTerrainHeight(p.mesh.position.x, p.mesh.position.z);
+                }
+                
+                p.update(dt, groundY);
                 if (p.shouldRemove) {
                     this.scene.remove(p.mesh);
                     this.projectiles.splice(i, 1);
                 }
             }
 
-            // Update Enemies (SP & BOSSRUSH)
-            if (this.mode === 'SP' || this.mode === 'BOSSRUSH') {
-                for (let i = this.enemies.length - 1; i >= 0; i--) {
-                    const e = this.enemies[i];
-                    e.update(dt, this.player.position);
-                    
-                    // Only remove if fully dead and animation finished
-                    if (e.isDead && e.shouldRemove) {
-                        this.scene.remove(e.mesh);
-                        this.enemies.splice(i, 1);
-                        this.player.score += 100;
-                        
-                        // Drop Logic (Boosted to 50% Chance)
-                        if (Math.random() < 0.5) { 
-                            const type = this.getWeightedRandomDrop();
-                            if (type) {
-                                this.spawnPickup(e.mesh.position, type);
-                            }
-                        }
-                    }
-                }
-            }
+            // Update Systems
+            if (this.entityManager) this.entityManager.update(dt);
+            if (this.waveManager) this.waveManager.update(dt);
+            if (this.collision) this.collision.update(dt);
+            this.particleSystem.update(dt);
 
             // Update Pickups
             for (let i = this.pickups.length - 1; i >= 0; i--) {
@@ -1148,7 +1237,7 @@ export class Game {
             exponent: { value: 0.6 }
         };
 
-        const skyGeo = new THREE.SphereGeometry(600, 32, 15);
+        const skyGeo = new THREE.SphereGeometry(4000, 32, 15);
         const skyMat = new THREE.ShaderMaterial({
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
@@ -1180,7 +1269,7 @@ export class Game {
         const starPos = new Float32Array(starCount * 3);
         
         for(let i=0; i<starCount * 3; i+=3) {
-            const r = 400; // Distance
+            const r = 3500; // Distance
             // Random spherical coordinates, but keep Y positive
             const theta = 2 * Math.PI * Math.random();
             const phi = Math.acos(1 - Math.random()); // Hemisphere
@@ -1196,6 +1285,16 @@ export class Game {
         this.scene.add(this.stars);
     }
     
+    updateMissionOverlay(text, color) {
+        const el = document.getElementById('mission-overlay');
+        if (el) {
+            el.innerText = text;
+            el.style.color = color;
+            el.style.opacity = 1;
+            el.style.textShadow = `0 0 20px ${color}`;
+        }
+    }
+
     createFloatingText(position, text, color) {
         const div = document.createElement('div');
         div.className = 'floating-text';
@@ -1271,10 +1370,176 @@ export class Game {
         this.spawnBoss('ED209');
     }
 
+    loadLevel(levelName) {
+        if (this.levelManager) {
+            this.levelManager.loadLevel(levelName);
+        } else {
+            console.error("Game.js: LevelManager not initialized");
+        }
+    }
+
+    update(dt) {
+         // Level Update
+         if (this.levelManager) this.levelManager.update(dt);
+         
+         // Old Level Specific Update (Deprecated but keeping for safety if not fully migrated)
+         if (this.currentLevel && this.currentLevel.update) {
+             this.currentLevel.update(dt);
+         }
+
+         if (this.mode === 'SPACE_FLIGHT') {
+             this.renderer.render(this.scene, this.camera);
+             return; 
+         }
+         
+         // Main Game Update (Existing)
+         // ...
+    }
+
     onWindowResize() {
         if (!this.camera || !this.renderer) return;
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Helper for Entities
+    getTerrainHeight(x, z) {
+        if (this.worldGen && this.worldGen.getHeight) {
+            return this.worldGen.getHeight(x, z);
+        }
+        return 0;
+    }
+
+    triggerReflectiveCutscene(e) {
+        // Trigger Flash
+        setTimeout(() => flash.style.opacity = '1', 50);
+
+        // 2. CINEMATIC OVERLAY (The Debris Scene)
+        const cinematic = document.createElement('div');
+        cinematic.id = 'cinematic-overlay';
+        Object.assign(cinematic.style, {
+            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'black', zIndex: '9998', display: 'flex', flexDirection: 'column',
+            justifyContent: 'center', alignItems: 'center', opacity: '0', transition: 'opacity 2s'
+        });
+        
+        // BETTER ART: Scattered Debris
+        cinematic.innerHTML = `
+            <div style="width: 100%; height: 100%; position: relative; overflow: hidden; background: radial-gradient(circle at center, #330000, #000000);">
+                <!-- Burning Ground -->
+                <div style="position: absolute; bottom: 0; width: 100%; height: 40%; background: linear-gradient(to top, #220000, transparent);"></div>
+                
+                <!-- Debris Field (SVG for better shapes) -->
+                <svg width="100%" height="100%" style="position: absolute; top:0; left:0;">
+                    <!-- Crater -->
+                    <ellipse cx="50%" cy="80%" rx="400" ry="100" fill="#110505" />
+                    
+                    <!-- Robot Leg (Torn) -->
+                    <path d="M 400 600 L 450 500 L 500 520 L 480 620 Z" fill="#222" stroke="#444" stroke-width="2" />
+                    
+                    <!-- Twisted Metal -->
+                    <path d="M 800 650 Q 850 500 900 680" stroke="#555" stroke-width="5" fill="none" />
+                    <rect x="600" y="550" width="100" height="60" fill="#333" transform="rotate(15)" />
+                    
+                    <!-- Sparks (CSS Animation classes could go here) -->
+                    <circle cx="450" cy="500" r="2" fill="orange" />
+                    <circle cx="620" cy="540" r="3" fill="yellow" />
+                </svg>
+
+                <!-- Cinematic Text (Legible) -->
+                <div style="position: absolute; bottom: 10%; width: 100%; text-align: center;">
+                     <div id="cine-text" style="
+                        font-family: 'Courier New', monospace; 
+                        font-size: 32px; 
+                        color: #00ff00; 
+                        background: rgba(0,0,0,0.8); 
+                        display: inline-block; 
+                        padding: 10px 20px; 
+                        border: 1px solid #00ff00;
+                        text-shadow: 0 0 10px #00ff00;">
+                        NUCLEAR THREAT NEUTRALIZED
+                     </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(cinematic);
+
+        // SEQUENCE
+        // 0s: Flash White
+        // 1.5s: Fade Flash -> Show Cinematic
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            cinematic.style.opacity = '1';
+        }, 1500);
+
+        // 4s: Update Text
+        setTimeout(() => {
+             const txt = document.getElementById('cine-text');
+             if(txt) txt.innerText = "COORDINATES ACQUIRED: THE CITADEL";
+        }, 4000);
+
+        // 8s: Transition
+        setTimeout(() => {
+             document.body.removeChild(flash);
+             document.body.removeChild(cinematic);
+             this.loadLevel('CASTLE');
+        }, 8000);
+    }
+
+
+
+    showReflectiveDialogue() {
+        // Simple HTML overlay
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.bottom = '20%';
+        container.style.width = '100%';
+        container.style.textAlign = 'center';
+        container.style.color = '#fff';
+        container.style.fontFamily = "'Courier New', monospace";
+        container.style.fontSize = '24px';
+        container.style.textShadow = '0 0 10px #000';
+        container.style.opacity = '0';
+        container.style.transition = 'opacity 2s';
+        document.body.appendChild(container);
+
+        const lines = [
+            "Systems critical...",
+            "Threat neutralized.",
+            "But at what cost?",
+            "..."
+        ];
+
+        let index = 0;
+        const showLine = () => {
+            if (index >= lines.length) {
+                // End
+                setTimeout(() => {
+                    container.style.opacity = 0;
+                    setTimeout(() => {
+                        container.remove();
+                        // Return to menu or continue?
+                        // Let's continue for now or end demo.
+                        alert("MISSION ACCOMPLISHED. RETURNING TO BASE.");
+                        location.reload(); 
+                    }, 2000);
+                }, 3000);
+                return;
+            }
+
+            container.innerText = lines[index];
+            container.style.opacity = 1;
+            
+            setTimeout(() => {
+                container.style.opacity = 0;
+                setTimeout(() => {
+                    index++;
+                    showLine();
+                }, 1000);
+            }, 3000);
+        };
+        
+        setTimeout(showLine, 1000);
     }
 }

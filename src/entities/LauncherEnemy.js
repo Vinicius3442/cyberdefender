@@ -113,10 +113,11 @@ export class LauncherEnemy extends Enemy {
     }
     
     animDie(t) {
-        // Fall back
-        if (t < 1.0) {
-            this.mesh.rotation.x = -Math.PI / 2 * t;
-            this.mesh.position.y -= 0.5 * t;
+        // Fall back and Crumble
+        if (t < 1.5) {
+            this.mesh.rotation.x = -Math.PI / 2 * Math.min(t * 1.5, 1);
+            this.mesh.rotation.z = Math.sin(t * 20) * 0.1; // Shake
+            this.mesh.position.y -= 1.0 * t * 0.5; // Sink
         }
     }
 

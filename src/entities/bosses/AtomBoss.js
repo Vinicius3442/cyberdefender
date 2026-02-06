@@ -299,6 +299,24 @@ export class AtomBoss extends Boss {
             this.nucleus.rotation.y += 0.5;
             this.nucleus.scale.setScalar(1 + progress * 5); // Grow huge
             
+            // 2. Continuous Explosions
+            if (Math.random() < 0.3) {
+                // Random position within expanding nucleus
+                const offset = new THREE.Vector3(
+                    (Math.random()-0.5) * 10 * progress,
+                    (Math.random()-0.5) * 10 * progress,
+                    (Math.random()-0.5) * 10 * progress
+                );
+                const pos = this.mesh.position.clone().add(offset);
+                
+                // Use Scene's ParticleSystem if available
+                if (this.scene.userData.particleSystem) {
+                     // Scale increases with time (5x to 20x)
+                     const scale = 5 + (progress * 15);
+                     this.scene.userData.particleSystem.createExplosion(pos, 0x00ff00, 10, scale);
+                }
+            }
+            
             this.nucleus.children.forEach(child => {
                 // Jiggle
                 child.position.add(new THREE.Vector3(
@@ -335,10 +353,13 @@ export class AtomBoss extends Boss {
 
             if (elapsed >= duration) {
                 clearInterval(deathInterval);
-                this.isDead = true; // NOW we let the Game remove us
-                // Manual cleanup just in case
-                // this.scene.remove(this.mesh); 
-                // Actually better to let Game.update loop verify isDead and clean arrays
+                this.isDead = true; 
+                
+                // Trigger Cutscene Logic
+                const evt = new CustomEvent('boss-defeated', { 
+                    detail: { bossName: this.name, position: this.mesh.position } 
+                });
+                document.dispatchEvent(evt);
             }
         }, 50);
     }

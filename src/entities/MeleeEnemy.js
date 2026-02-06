@@ -8,11 +8,6 @@ export class MeleeEnemy extends Enemy {
         this.hp = 60;
         this.scoreValue = 150;
         this.damage = 15;
-        
-        // Animation State
-        // Animation State - initialized in _createMesh
-        // this.legs = []; // Store leg meshes for animation
-        // this.eyes = [];
     }
 
     _createMesh() {

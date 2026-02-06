@@ -1,3 +1,4 @@
+import { CinematicIntro } from './CinematicIntro.js';
 
 export class BootSequence {
     constructor(onComplete) {
@@ -33,7 +34,15 @@ export class BootSequence {
             this.shutters.classList.remove('open');
         }
         
-        // Add skip listener with delay to prevent immediate skip from Shell interaction
+        // Run Cinematic Intro First
+        const intro = new CinematicIntro(() => {
+            // After intro finishes (5s), start text sequence
+            this.runTextSequence();
+        });
+    }
+
+    runTextSequence() {
+        // Add skip listener with delay
         setTimeout(() => {
             document.addEventListener('click', this.clickHandler);
             document.addEventListener('keydown', this.clickHandler);
@@ -76,6 +85,36 @@ export class BootSequence {
     }
 
     finish() {
+        // Create interaction prompt to reclaim Pointer Lock
+        const prompt = document.createElement('div');
+        prompt.innerText = "[ CLICK TO DEPLOY ]";
+        prompt.style.position = 'absolute';
+        prompt.style.bottom = '20%';
+        prompt.style.width = '100%';
+        prompt.style.textAlign = 'center';
+        prompt.style.color = '#0f0';
+        prompt.style.fontFamily = 'Courier New';
+        prompt.style.fontSize = '24px';
+        prompt.style.cursor = 'pointer';
+        prompt.style.animation = 'blink 1s infinite';
+        this.container.appendChild(prompt);
+        
+        // Wait for user interaction
+        const startHandler = () => {
+            prompt.remove();
+            document.removeEventListener('click', startHandler);
+            document.removeEventListener('keydown', startHandler);
+            this.finalLaunch();
+        };
+        
+        document.addEventListener('click', startHandler);
+        document.addEventListener('keydown', startHandler);
+    }
+
+    finalLaunch() {
+        // Start Game immediately
+        if (this.onComplete) this.onComplete();
+
         // Clean up listeners
         document.removeEventListener('click', this.clickHandler);
         document.removeEventListener('keydown', this.clickHandler);
@@ -96,9 +135,9 @@ export class BootSequence {
             // Hide shutters after they are fully open (transition is 0.5s)
             setTimeout(() => {
                 if (this.shutters) this.shutters.style.display = 'none';
-                if (this.onComplete) this.onComplete();
             }, 600);
             
         }, 500);
+
     }
 }

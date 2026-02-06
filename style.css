@@ -369,6 +369,32 @@ body {
     opacity: 1 !important;
 }
 
+#menu-mouth {
+    position: absolute;
+    top: 68%; /* Lowered further */
+    left: 55%; /* Near right eye */
+    font-family: 'Courier New', monospace;
+    font-size: 64px;
+    color: #4af626;
+    font-weight: bold;
+    transform: rotate(90deg);
+    text-shadow: 0 0 10px #4af626;
+    animation: mouthBob 2s infinite ease-in-out;
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 2200;
+}
+
+@keyframes mouthBob {
+    0%, 100% { transform: rotate(90deg) translateX(0); }
+    50% { transform: rotate(90deg) translateX(-5px); }
+}
+
+/* Dizziness Class - Applied via JS */
+.dizzy-effect {
+    transition: filter 0.1s, transform 0.1s;
+}
+
 #shell-container {
     position: absolute;
     top: 0; left: 0;

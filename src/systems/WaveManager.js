@@ -81,6 +81,10 @@ export class WaveManager {
         this.currentWave++; // Use currentWave
         this.waveInProgress = true;
         this.bossSpawned = false; // Reset boss flag for new wave
+        
+        if (this.player && this.player.resetImmunity) {
+            this.player.resetImmunity();
+        }
 
         const waveDisplay = document.getElementById('wave-display');
         if (waveDisplay) waveDisplay.innerText = this.currentWave;
@@ -152,7 +156,20 @@ export class WaveManager {
     }
 
     getEnemyType() {
-        // Random Enemy Type based on weights
+        // CASTLE BIOME OVERRIDE
+        // If we are in Castle Level, spawn only Castle enemies
+        // We can check local property or Game property
+        if (this.game.currentLevelName === 'CASTLE' || (this.game.level && this.game.level.name === 'CASTLE')) {
+             const rand = Math.random();
+             // Castle Spawn Logic
+             if (rand < 0.3) return 'KNIGHT'; // 30% Knights
+             if (rand < 0.5) return 'ARCHER'; // 20% Archers
+             if (rand < 0.7) return 'SHIELD'; // 20% Shield Guards
+             if (rand < 0.8) return 'NINJA';  // 10% Ninjas
+             return 'TANK'; // 20% Heavy Backup (Tanks)
+        }
+
+        // WASTELAND (Default)
         const rand = Math.random();
         
         if (rand < 0.3) return 'MELEE';

@@ -81,38 +81,9 @@ export class ExplosiveEnemy extends Enemy {
 
         this.updateGroundPosition();
     }
-    
-    // animDie overridden by instant explosion logic in base or Collision?
-    // Actually, explosive enemy usually explodes on contact.
-    // If shot, it should probably also explode.
-    
     die() {
          super.die();
-         // Fix: Trigger explicit explosion effect if died by shooting
          if (this.mesh && this.mesh.visible) {
-             // Create explosion effect manually if not triggered by collision
-             // We can access particle system via scene/game ref if available?
-             // Actually Collision.js handles particles.
-             // If we just want visual flair:
-             // But we don't have easy access to Game/Particles here without passing it in.
-             // However, checks in Game.js remove it.
-             // Let's assume Collision handles physics explosion.
-             // Just ensure we don't vanish INSTANTLY if we want "crumble"?
-             // No, explosive enemies usually vanish into particles.
-             
-             // Issue: User said it "Instant vanishes".
-             // If we want it to look good, we need particles.
-             // The Collision system spawns particles on CONTACT.
-             // When SHOT, it just calls `die()`.
-             // We need to spawn particles here.
-             
-             // HACK: Use a global event or try to find particle system?
-             // Or better: Pass Game/ParticleSystem to Enemy constructor.
-             // For now, let's just create a quick "pop" if possible, or rely on Game.js update loop to handle death effects?
-             // Game.js has: if (e.isDead && e.shouldRemove) { remove... }
-             // It doesn't spawn particles there for death.
-             
-             // Let's trigger a custom event that Game.js listens to?
              const event = new CustomEvent('enemy-death', { 
                  detail: { 
                      type: 'EXPLOSION', 

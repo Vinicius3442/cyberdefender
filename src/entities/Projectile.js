@@ -98,8 +98,11 @@ export class Projectile {
         this.mesh.position.add(moveStep);
 
         // Floor Collision
-        if (this.mesh.position.y <= 0) {
-            this.mesh.position.y = 0;
+        // Use provided floor height or default to 0
+        const floorHeight = (arguments.length > 1 && typeof arguments[1] === 'number') ? arguments[1] : 0;
+        
+        if (this.mesh.position.y <= floorHeight) {
+            this.mesh.position.y = floorHeight;
             this.hitFloor = true;
 
             // Arrow Logic: Stick to floor

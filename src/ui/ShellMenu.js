@@ -47,13 +47,56 @@ export class ShellMenu {
             this.faceState.eyeY = (e.clientY - cy) / cy;
         });
         
-        // Click to Open Shell
+        // Click to Open Shell (Trigger Boot Screen first)
         this.faceContainer.addEventListener('click', () => {
             this.faceContainer.style.display = 'none';
-            this.shellContainer.style.display = 'block';
-            this.renderNeofetch();
-            this.input.focus();
+            this.playOSBootSequence(); 
         });
+    }
+    
+    playOSBootSequence() {
+        const bootScreen = document.getElementById('os-boot-screen');
+        const barFill = document.getElementById('boot-bar-fill');
+        const statusText = document.getElementById('boot-status');
+        
+        bootScreen.style.display = 'flex';
+        
+        const steps = [
+            { t: 0, text: "INITIALIZING..." },
+            { t: 500, text: "MOUNTING VOLUMES [C:/ROOT]" },
+            { t: 1200, text: "LOADING DRIVERS: NEURAL_NET.SYS" },
+            { t: 2000, text: "CHECKING PERIPHERALS... OK" },
+            { t: 2800, text: "ESTABLISHING SECURE CONNECTION..." },
+            { t: 3500, text: "ACCESS GRANTED" }
+        ];
+        
+        let startTime = performance.now();
+        const duration = 4000;
+        
+        const updateBoot = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            barFill.style.width = `${progress * 100}%`;
+            
+            // Find current text step
+            const step = steps.slice().reverse().find(s => elapsed >= s.t);
+            if (step) statusText.innerText = step.text;
+            
+            if (progress < 1) {
+                requestAnimationFrame(updateBoot);
+            } else {
+                // Done
+                setTimeout(() => {
+                    bootScreen.style.display = 'none';
+                    this.shellContainer.style.display = 'block';
+                    this.renderNeofetch();
+                    this.input.focus();
+                }, 500);
+            }
+        };
+        requestAnimationFrame(updateBoot);
     }
     
     resize() {
@@ -173,8 +216,9 @@ export class ShellMenu {
         switch(cmd) {
             case 'help':
                 this.print("Available commands:");
-                this.print("  start [name]  - Launch connection to server");
-                this.print("  fetch         - Refresh system status");
+                this.print("  start [name]   - Launch game");
+                this.print("    Flags: -castle (Jump to Wave 11), -skip (Fast Start)");
+                this.print("  fetch          - Refresh system status");
                 this.print("  clear         - Clear terminal");
                 break;
                 
@@ -187,15 +231,32 @@ export class ShellMenu {
                 break;
                 
             case 'start':
-            case 'game': // Handle 'game start'
-                if (cmd === 'game' && args[0] !== 'start') {
-                    this.print("Did you mean 'game start'?");
-                    break;
+            case 'game': 
+                let mode = 'SP';
+                let name = this.playerName;
+                let skipIntro = false;
+                
+                // Parse Args
+                const startArgs = (cmd === 'game') ? args.slice(1) : args;
+                
+                for (const arg of startArgs) {
+                    if (arg.startsWith('-')) {
+                        // Flags
+                        const flag = arg.replace(/^-+/, '').toLowerCase();
+                        if (flag === 'castle') mode = 'CASTLE';
+                        if (flag === 'skip' || flag === 's') skipIntro = true;
+                        if (flag === 'bossrush') mode = 'BOSSRUSH';
+                    } else {
+                        // Name (First non-flag arg)
+                        if (!name || name === "Soldier") name = arg;
+                    }
                 }
                 
-                const name = (cmd === 'game' ? args[1] : args[0]) || this.playerName;
                 this.playerName = name;
-                this.startGame();
+                
+                if (mode === 'CASTLE') this.print("INITIALIZING CASTLE INSERTION...");
+                
+                this.startGame(mode, { skipIntro });
                 break;
                 
             case 'bossrush':
@@ -207,8 +268,6 @@ export class ShellMenu {
                 const bossName = args[0];
                 if (bossName === 'ed209' || bossName === 'worm') {
                     this.print(`QUEUED DEPLOYMENT: ${bossName.toUpperCase()}`);
-                    // We need to pass this to Game start...
-                    // Store in a global or static param?
                     window.GAME_PARAMS = window.GAME_PARAMS || {};
                     window.GAME_PARAMS.bossQueue = bossName;
                 } else {
@@ -227,13 +286,12 @@ export class ShellMenu {
         }
     }
     
-    startGame(mode = 'SP') {
+    startGame(mode = 'SP', options = {}) {
         this.active = false; // Stop face anim
         this.shellContainer.style.display = 'none';
         
-        // Trigger Boot Sequence via callback
         const bootSeq = new BootSequence(() => {
-            this.startGameCallback(this.playerName, mode);
+            this.startGameCallback(this.playerName, mode, options);
         });
         bootSeq.start();
     }

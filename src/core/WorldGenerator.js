@@ -4,7 +4,8 @@ import { Utils } from './Utils.js';
 export class WorldGenerator {
     constructor(scene) {
         this.scene = scene;
-        this.worldSize = 200; // 200x200 meters
+        this.worldSize = 2500; // Expanded for Horizon
+        this.spawnRadius = 250; // Keep gameplay area focused
         this.chunkSize = 10;
         this.props = [];
     }
@@ -13,6 +14,7 @@ export class WorldGenerator {
         this.createGround();
         this.createRuins();
         this.createCyberTrees();
+        this.spawnTechCastle();
     }
 
     spawnBossArena(center) {
@@ -46,7 +48,8 @@ export class WorldGenerator {
 
     createGround() {
         // Post-Apocalyptic Ground (Charred/Dark)
-        const geometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 64, 64);
+        // High segment count for large world to maintain terrain detail
+        const geometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 256, 256);
         
         // Displace vertices for uneven terrain
         const posAttribute = geometry.attributes.position;
@@ -105,8 +108,8 @@ export class WorldGenerator {
         const matConcrete = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
 
         for (let i = 0; i < numRuins; i++) {
-            const x = (Math.random() - 0.5) * (this.worldSize - 20);
-            const z = (Math.random() - 0.5) * (this.worldSize - 20);
+            const x = (Math.random() - 0.5) * (this.spawnRadius * 2);
+            const z = (Math.random() - 0.5) * (this.spawnRadius * 2);
             
             // Don't spawn on spawn point
             if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
@@ -152,8 +155,8 @@ export class WorldGenerator {
         });
 
         for (let i = 0; i < numTrees; i++) {
-            const x = (Math.random() - 0.5) * (this.worldSize - 20);
-            const z = (Math.random() - 0.5) * (this.worldSize - 20);
+            const x = (Math.random() - 0.5) * (this.spawnRadius * 2);
+            const z = (Math.random() - 0.5) * (this.spawnRadius * 2);
             
             if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
 
@@ -177,5 +180,106 @@ export class WorldGenerator {
             this.scene.add(group);
             this.props.push(group);
         }
+    }
+
+    spawnTechCastle() {
+        const center = new THREE.Vector3(0, 0, -2000);
+        
+        // 1. The Core Spire (Giant Obelisk)
+        const spireHeight = 800;
+        const spireGeo = new THREE.CylinderGeometry(20, 100, spireHeight, 6);
+        const spireMat = new THREE.MeshStandardMaterial({ 
+            color: 0x111111, 
+            roughness: 0.2, 
+            metalness: 0.9,
+            emissive: 0x00ffff,
+            emissiveIntensity: 0.2
+        });
+        const spire = new THREE.Mesh(spireGeo, spireMat);
+        spire.position.copy(center);
+        spire.position.y = spireHeight / 2 - 50; 
+        this.scene.add(spire);
+
+        // 2. Floating Rings around Spire
+        const ringGeo = new THREE.TorusGeometry(150, 5, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+        
+        for(let i=0; i<3; i++) {
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.copy(center);
+            ring.position.y = 200 + i * 150;
+            ring.rotation.x = Math.PI / 2;
+            ring.userData = { rotSpeed: 0.2 + i * 0.1 };
+            this.scene.add(ring);
+            this.props.push(ring); // Add to props so we might animate them later? Or manual update?
+            // Since WorldGenerator doesn't update, we might need a controller.
+            // For now, static or user shader.
+        }
+
+        // 3. Base Fortress (The City)
+        const cityGroup = new THREE.Group();
+        cityGroup.position.copy(center);
+        
+        const blockGeo = new THREE.BoxGeometry(1,1,1);
+        const blockMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+
+        for(let i=0; i<50; i++) {
+            const w = 20 + Math.random() * 50;
+            const h = 50 + Math.random() * 200;
+            const d = 20 + Math.random() * 50;
+            
+            const building = new THREE.Mesh(blockGeo, blockMat);
+            building.scale.set(w, h, d);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 150 + Math.random() * 300;
+            
+            building.position.set(
+                Math.cos(angle) * radius,
+                h / 2,
+                Math.sin(angle) * radius
+            );
+            
+            // Add some lights
+            if (Math.random() > 0.7) {
+                const light = new THREE.PointLight(0x00ffff, 1, 300);
+                light.position.set(building.position.x, h, building.position.z);
+                cityGroup.add(light);
+            }
+            
+            cityGroup.add(building);
+        }
+        this.scene.add(cityGroup);
+
+        // 4. Beam to Sky
+        const beamGeo = new THREE.CylinderGeometry(5, 5, 5000, 32);
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.copy(center);
+        beam.position.y = 2500;
+        this.scene.add(beam);
+        this.scene.add(beam);
+        this.props.push(beam);
+        this.props.push(spire); // Track main structures too
+        this.props.push(cityGroup); // Track city
+    }
+
+    clear() {
+        // Remove all tracked props
+        this.props.forEach(prop => {
+            if (prop.parent) prop.parent.remove(prop);
+        });
+        this.props = [];
+
+        // Remove Ground
+        if (this.ground) {
+            this.scene.remove(this.ground);
+            this.ground.geometry.dispose();
+            this.ground.material.dispose();
+            this.ground = null;
+        }
+
+        // Remove Tech Castle specific references if any were not in props?
+        // (Modified spawnTechCastle to push to props above)
     }
 }

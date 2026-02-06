@@ -9,10 +9,6 @@ export class TankEnemy extends Enemy {
         this.damage = 30;
         this.scoreValue = 300;
         
-        // Parts
-        // Parts - initialized in _createMesh
-        // this.shieldArm = null;
-        // this.legs = [];
     }
 
     _createMesh() {

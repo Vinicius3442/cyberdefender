@@ -24,15 +24,14 @@ export class ParticleSystem {
         });
     }
 
-    createExplosion(position, color = 0xffaa00, count = 20) {
+    createExplosion(position, color = 0xffaa00, count = 20, scale = 1.0) {
         // 1. Expanding Sphere
-        // Clone material to handle opacity fading independently? 
-        // Yes, otherwise all explosions fade together.
         const mat = this.matExplosion.clone();
         mat.color.setHex(color);
 
         const sphere = new THREE.Mesh(this.sphereGeom, mat);
         sphere.position.copy(position);
+        sphere.scale.setScalar(scale); // Apply base scale
         this.scene.add(sphere);
 
         this.particles.push({
@@ -40,7 +39,8 @@ export class ParticleSystem {
             type: 'explosion_sphere',
             life: 0.5,
             maxLife: 0.5,
-            scaleSpeed: 10.0
+            scaleSpeed: 10.0 * scale, // Scale speed relative to size
+            baseScale: scale
         });
 
         // 2. Debris Particles
@@ -52,12 +52,13 @@ export class ParticleSystem {
         for (let i = 0; i < count; i++) {
             const mesh = new THREE.Mesh(this.boxGeom, debrisMat);
             mesh.position.copy(position);
+            mesh.scale.setScalar(scale); // Scale debris chunks
 
             // Random velocity
             const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 10,
-                (Math.random() - 0.5) * 10 + 5, // Upward bias
-                (Math.random() - 0.5) * 10
+                (Math.random() - 0.5) * 10 * scale,
+                (Math.random() - 0.5) * 10 * scale + (5 * scale), // Upward bias
+                (Math.random() - 0.5) * 10 * scale
             );
 
             this.scene.add(mesh);
