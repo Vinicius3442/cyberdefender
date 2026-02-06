@@ -11,25 +11,26 @@ export class ShieldEnemy extends Enemy {
         this.scoreValue = 150;
         this.shieldHealth = 100;
         this.isShieldActive = true;
-        
-        // Create Visuals
-        this.createMesh();
     }
 
-    createMesh() {
+    _createMesh() {
+        const group = new THREE.Group();
+
         // Body (Dark Grey Armor)
         const geometry = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
         const material = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(this.position);
+        const body = new THREE.Mesh(geometry, material);
+        // Position relative to group (origin at feet)
+        body.position.y = 0.9;
+        group.add(body);
         
         // Head (Helmet)
         const head = new THREE.Mesh(
             new THREE.BoxGeometry(0.5, 0.5, 0.5),
             new THREE.MeshStandardMaterial({ color: 0x222222 })
         );
-        head.position.y = 1.0;
-        this.mesh.add(head);
+        head.position.y = 1.9;
+        group.add(head);
         
         // Energy Shield (Front)
         const shieldGeo = new THREE.BoxGeometry(1.2, 1.5, 0.1);
@@ -41,11 +42,10 @@ export class ShieldEnemy extends Enemy {
             emissiveIntensity: 0.5
         });
         this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
-        this.shieldMesh.position.set(0, 0, 0.6); // Front
-        this.mesh.add(this.shieldMesh);
+        this.shieldMesh.position.set(0, 0.9, 0.6); // Front
+        group.add(this.shieldMesh);
         
-        this.mesh.castShadow = true;
-        this.scene.add(this.mesh);
+        return group;
     }
 
     takeDamage(amount) {

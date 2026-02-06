@@ -12,11 +12,11 @@ export class NinjaEnemy extends Enemy {
         
         this.stealthTimer = 0;
         this.isStealth = false;
-        
-        this.createMesh();
     }
 
-    createMesh() {
+    _createMesh() {
+        const group = new THREE.Group();
+
         // Sleek Black Robot
         const geometry = new THREE.CylinderGeometry(0.4, 0.3, 1.7, 8);
         this.material = new THREE.MeshStandardMaterial({ 
@@ -26,16 +26,16 @@ export class NinjaEnemy extends Enemy {
             transparent: true,
             opacity: 1.0
         });
-        this.mesh = new THREE.Mesh(geometry, this.material);
-        this.mesh.position.copy(this.position);
+        const body = new THREE.Mesh(geometry, this.material);
+        body.position.y = 0.85;
+        group.add(body);
         
         // Red Eye Visor
         const visor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        visor.position.set(0, 0.6, 0.2);
-        this.mesh.add(visor);
+        visor.position.set(0, 1.45, 0.2);
+        group.add(visor);
         
-        this.mesh.castShadow = true;
-        this.scene.add(this.mesh);
+        return group;
     }
 
     update(dt, playerPos) {

@@ -53,8 +53,9 @@ export class CitadelEye {
         this.overlay.style.zIndex = '1000';
         
         // CSS Glitch Effect
-        this.overlay.style.background = 'rgba(255, 0, 0, 0.2)';
-        this.overlay.style.mixBlendMode = 'overlay';
+        // Stronger Red Vignette
+        this.overlay.style.background = 'radial-gradient(circle, transparent 20%, rgba(255, 0, 0, 0.4) 80%, rgba(255, 0, 0, 0.8) 100%)';
+        this.overlay.style.mixBlendMode = 'hard-light'; // More aggressive blend
         
         // Text Container
         this.textContainer = document.createElement('div');
@@ -87,27 +88,36 @@ export class CitadelEye {
         
         const dot = lookDir.dot(toEye);
         
-        if (dot > this.lookThreshold) {
-            // Player is looking directly at the eye
+        // Threshold 0.85 (approx 30 degrees)
+        if (dot > 0.85) {
+            // Player is looking at the eye
             this.glitchIntensity = Math.min(this.glitchIntensity + dt * 2, 1);
             
             // Effect
             this.overlay.style.display = 'block';
+            this.overlay.style.opacity = this.glitchIntensity;
             
             // Random Text Position
             if (Math.random() < 0.1) {
-                this.textContainer.style.transform = `translate(${Math.random()*10 - 5}px, ${Math.random()*10 - 5}px) skew(${Math.random()*20}deg)`;
+                const x = (Math.random() - 0.5) * 20;
+                const y = (Math.random() - 0.5) * 20;
+                this.textContainer.style.transform = `translate(${x}px, ${y}px) skew(${Math.random()*20}deg)`;
                 this.textContainer.innerHTML = Math.random() < 0.5 ? "J O I N &nbsp; U S" : "S U B M I T";
             }
             
-            // Damage Sanity/Health?
-            // For now just annoying visual
+            // DAMAGE PLAYER
+            if (this.player && this.player.takeDamage) {
+                // Apply damage over time
+                this.player.takeDamage(this.damageRate * dt);
+            }
             
         } else {
             // Decay
             this.glitchIntensity = Math.max(this.glitchIntensity - dt, 0);
             if (this.glitchIntensity <= 0) {
                 this.overlay.style.display = 'none';
+            } else {
+                this.overlay.style.opacity = this.glitchIntensity;
             }
         }
         

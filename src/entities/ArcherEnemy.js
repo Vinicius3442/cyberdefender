@@ -11,26 +11,31 @@ export class ArcherEnemy extends RangedEnemy {
         this.scoreValue = 120;
         this.attackRange = 40; // Long range
         this.fireRate = 2.0; // Slow but deadly
-        
-        this.createArcherMesh();
     }
 
-    createArcherMesh() {
+    _createMesh() {
+        const group = new THREE.Group();
+
         // Lean robot, green/brown camo?
-        if (this.mesh) this.scene.remove(this.mesh);
-        
         const geometry = new THREE.CapsuleGeometry(0.4, 1.0, 4, 8);
         const material = new THREE.MeshStandardMaterial({ color: 0x556622 }); // Ranger Green
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(this.position);
+        const body = new THREE.Mesh(geometry, material);
+        body.position.y = 0.9; // Capsule center
+        group.add(body);
+        this.headMesh = body; // Alias for death anim
         
         // Crossbow Model
         const bow = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: 0x332211 }));
-        bow.position.set(0, 0.2, 0.5);
-        this.mesh.add(bow);
+        bow.position.set(0, 1.1, 0.5);
+        group.add(bow);
+        this.gunArm = bow; // Alias for attack anim
         
-        this.mesh.castShadow = true;
-        this.scene.add(this.mesh);
+        // Define other missing props to be safe
+        this.chassisMesh = body;
+        this.eyeMesh = new THREE.Mesh(); // Dummy
+        this.leftPlate = new THREE.Mesh(); // Dummy
+        
+        return group;
     }
 
     shoot(targetPos) {
@@ -55,5 +60,16 @@ export class ArcherEnemy extends RangedEnemy {
         
         this.projectiles.push(proj);
         this.scene.add(proj.mesh);
+    }
+
+    animAttack(t) {
+        // Bow Recoil (Pull back then release?)
+        // Simple recoil for now
+        if (t < 0.1) {
+            this.gunArm.position.z -= 0.1; 
+        } else {
+            this.gunArm.position.z = THREE.MathUtils.lerp(this.gunArm.position.z, 0.5, 0.1);
+            if (t > 0.5) this.currentAnim = null;
+        }
     }
 }

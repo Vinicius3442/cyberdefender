@@ -14,6 +14,7 @@ export class WorldGenerator {
         this.createGround();
         this.createRuins();
         this.createCyberTrees();
+        this.createFoliage(); // New Instanced Foliage
         this.spawnTechCastle();
     }
 
@@ -51,49 +52,43 @@ export class WorldGenerator {
         // High segment count for large world to maintain terrain detail
         const geometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 256, 256);
         
-        // Displace vertices for uneven terrain
+        const count = geometry.attributes.position.count;
+        geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+
         const posAttribute = geometry.attributes.position;
-        for (let i = 0; i < posAttribute.count; i++) {
+        const colAttribute = geometry.attributes.color;
+        
+        const colorLow = new THREE.Color(0x332211); // Dark scorched valley
+        const colorHigh = new THREE.Color(0x8b5a2b); // Lighter dust/sand peak
+        const tempColor = new THREE.Color();
+
+        for (let i = 0; i < count; i++) {
             const x = posAttribute.getX(i);
-            const y = posAttribute.getY(i); // This is actually local coordinate relative to plane center
-            // PlaneGeometry is created on XY plane. We rotate it later?
-            // Wait, standard PlaneGeometry is X, Y. 
-            // When we rotate X -90, Y becomes -Z.
-            // So logic:
-            // Local X -> World X
-            // Local Y -> World -Z (since we rotate -PI/2)
+            const y = posAttribute.getY(i); 
             
-            // Actually simpler:
-            // Just apply height to Z (which becomes Y after rotation? No.)
-            // PlaneGeometry: vertices are (x, y, 0).
-            // Rotation -90 deg X: (x, 0, -y) or (x, z, y)?
-            // Visual: Flat on ground. Normal pointing up (Y).
-            // Z attribute becomes Y height? No.
-            
-            // Let's stick to standard Three.js approach:
-            // Plane lying on XZ plane? No, Plane is XY default.
-            // We rotate it. So Local Z becomes World -Y? Or World Z?
-            
-            // Let's just use a helper or assume standard mapping:
-            // After rotation x=-PI/2:
-            // Local X -> World X
-            // Local Y -> World -Z
-            // Local Z -> World Y (Height)
-            
+            // Standard Mapping
             const worldX = x;
             const worldZ = -y; 
             
             const height = this.getHeight(worldX, worldZ);
             posAttribute.setZ(i, height); // Displace "flat" plane
+
+            // Vertex Coloring based on Height + Noise
+            // Normalize height roughly between -2 and 2
+            let t = (height + 2) / 4; 
+            t += (Math.random() - 0.5) * 0.2; // Add noise
+            t = Math.max(0, Math.min(1, t));
+
+            tempColor.lerpColors(colorLow, colorHigh, t);
+            colAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
         }
         
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-            color: 0x8b5a2b, // Scorched Earth/Sand
+            vertexColors: true, // ENABLE VERTEX COLORS
             roughness: 1.0,
-            metalness: 0.0,
-            vertexColors: false
+            metalness: 0.0
         });
 
         this.ground = new THREE.Mesh(geometry, material);
@@ -102,48 +97,110 @@ export class WorldGenerator {
         this.scene.add(this.ground);
     }
 
+    createFoliage() {
+        // Dead Bushes using InstancedMesh (Efficient)
+        const instanceCount = 1500;
+        
+        // Simple Geometry for Bush (2 Crossed Planes or a Tetrahedron)
+        // Tetrahedron is very low poly
+        const geometry = new THREE.TetrahedronGeometry(0.5, 0); 
+        const material = new THREE.MeshStandardMaterial({ color: 0x443322, roughness: 1.0 });
+
+        const mesh = new THREE.InstancedMesh(geometry, material, instanceCount);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+
+        const dummy = new THREE.Object3D();
+        // const color = new THREE.Color(); // Unused
+
+        for (let i = 0; i < instanceCount; i++) {
+            // Random Position
+            const angle = Math.random() * Math.PI * 2;
+            const r = 20 + Math.random() * (this.spawnRadius * 3); // Avoid center spawn (0-20)
+            
+            const x = Math.cos(angle) * r;
+            const z = Math.sin(angle) * r;
+            
+            // Get Height at position
+            const y = this.getHeight(x, z);
+
+            dummy.position.set(x, y + 0.2, z);
+            
+            // Random Rotation
+            dummy.rotation.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
+            
+            // Random Scale
+            const s = 0.5 + Math.random() * 1.5;
+            dummy.scale.set(s, s, s);
+
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        this.scene.add(mesh);
+        this.props.push(mesh);
+    }
+
     createRuins() {
         // Scatter broken walls and pillars
-        const numRuins = 30;
+        // Use InstancedMesh instead of individual Meshes
+        const numRuins = 40; // Total
         const matConcrete = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
-
+        
+        // 1. Walls
+        const wallGeo = new THREE.BoxGeometry(4, 3, 0.5);
+        const wallMesh = new THREE.InstancedMesh(wallGeo, matConcrete, numRuins);
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        // 2. Pillars
+        const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, 6, 8);
+        const pillarMesh = new THREE.InstancedMesh(pillarGeo, matConcrete, numRuins);
+        pillarMesh.castShadow = true;
+        pillarMesh.receiveShadow = true;
+        
+        const dummy = new THREE.Object3D();
+        let wallCount = 0;
+        let pillarCount = 0;
+        
         for (let i = 0; i < numRuins; i++) {
             const x = (Math.random() - 0.5) * (this.spawnRadius * 2);
             const z = (Math.random() - 0.5) * (this.spawnRadius * 2);
             
-            // Don't spawn on spawn point
             if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
-
-            // Random Ruin Type
+            
             if (Math.random() > 0.5) {
-                // Wall Section
-                const width = 2 + Math.random() * 4;
-                const height = 2 + Math.random() * 3;
-                const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.5), matConcrete);
-                mesh.position.set(x, height / 2, z);
-                mesh.rotation.y = Math.random() * Math.PI;
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                this.scene.add(mesh);
-                this.props.push(mesh);
+                // Wall
+                dummy.position.set(x, 1.5, z);
+                dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                dummy.scale.set(1 + Math.random(), 1 + Math.random()*0.5, 1);
+                dummy.updateMatrix();
+                wallMesh.setMatrixAt(wallCount++, dummy.matrix);
             } else {
-                // Toppled Pillar
-                const height = 4 + Math.random() * 4;
-                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, height, 8), matConcrete);
-                mesh.position.set(x, 0.5, z);
-                // Tip it over
-                mesh.rotation.z = Math.PI / 2;
-                mesh.rotation.y = Math.random() * Math.PI;
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                this.scene.add(mesh);
-                this.props.push(mesh);
+                // Pillar
+                dummy.position.set(x, 0.5, z);
+                dummy.rotation.set(0, Math.random() * Math.PI, Math.PI / 2); // Toppled
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                pillarMesh.setMatrixAt(pillarCount++, dummy.matrix);
             }
         }
+        
+        // Set count
+        wallMesh.count = wallCount;
+        pillarMesh.count = pillarCount;
+        
+        this.scene.add(wallMesh);
+        this.scene.add(pillarMesh);
+        this.props.push(wallMesh);
+        this.props.push(pillarMesh);
     }
 
     createCyberTrees() {
         // Trees with glowing leaves (Neon style)
+        // Keep as Group for now since they are composite (Trunk + Cone)
+        // Optimization: Could be 2 InstancedMeshes (Trunks + Leaves)
+        
         const numTrees = 20;
         const matTrunk = new THREE.MeshStandardMaterial({ color: 0x443322 }); // Dry Wood
         const matLeaves = new THREE.MeshStandardMaterial({ 
@@ -185,7 +242,7 @@ export class WorldGenerator {
     spawnTechCastle() {
         const center = new THREE.Vector3(0, 0, -2000);
         
-        // 1. The Core Spire (Giant Obelisk)
+        // 1. The Core Spire (Giant Obelisk) - Single Mesh (OK)
         const spireHeight = 800;
         const spireGeo = new THREE.CylinderGeometry(20, 100, spireHeight, 6);
         const spireMat = new THREE.MeshStandardMaterial({ 
@@ -200,7 +257,7 @@ export class WorldGenerator {
         spire.position.y = spireHeight / 2 - 50; 
         this.scene.add(spire);
 
-        // 2. Floating Rings around Spire
+        // 2. Floating Rings around Spire - Small count (3), OK as Mesh
         const ringGeo = new THREE.TorusGeometry(150, 5, 16, 100);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
         
@@ -211,44 +268,50 @@ export class WorldGenerator {
             ring.rotation.x = Math.PI / 2;
             ring.userData = { rotSpeed: 0.2 + i * 0.1 };
             this.scene.add(ring);
-            this.props.push(ring); // Add to props so we might animate them later? Or manual update?
-            // Since WorldGenerator doesn't update, we might need a controller.
-            // For now, static or user shader.
+            this.props.push(ring); 
         }
 
-        // 3. Base Fortress (The City)
-        const cityGroup = new THREE.Group();
-        cityGroup.position.copy(center);
-        
+        // 3. Base Fortress (The City) - INSTANCED OPTIMIZATION
+        const cityCount = 60; // Increased count safely due to instancing
         const blockGeo = new THREE.BoxGeometry(1,1,1);
         const blockMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
-
-        for(let i=0; i<50; i++) {
+        
+        const cityMesh = new THREE.InstancedMesh(blockGeo, blockMat, cityCount);
+        cityMesh.castShadow = true;
+        cityMesh.receiveShadow = true;
+        
+        const dummy = new THREE.Object3D();
+        const cityGroup = new THREE.Group(); // Only for lights
+        
+        for(let i=0; i<cityCount; i++) {
             const w = 20 + Math.random() * 50;
             const h = 50 + Math.random() * 200;
             const d = 20 + Math.random() * 50;
             
-            const building = new THREE.Mesh(blockGeo, blockMat);
-            building.scale.set(w, h, d);
-            
             const angle = Math.random() * Math.PI * 2;
             const radius = 150 + Math.random() * 300;
             
-            building.position.set(
-                Math.cos(angle) * radius,
-                h / 2,
-                Math.sin(angle) * radius
+            // Set Transform
+            dummy.position.set(
+                center.x + Math.cos(angle) * radius,
+                center.y + h / 2,
+                center.z + Math.sin(angle) * radius
             );
+            dummy.scale.set(w, h, d);
+            dummy.rotation.set(0, angle, 0); // Face center roughly
+            dummy.updateMatrix();
             
-            // Add some lights
-            if (Math.random() > 0.7) {
+            cityMesh.setMatrixAt(i, dummy.matrix);
+            
+            // Minimal Lights (Optimization: Don't spawn light for every building)
+            if (i % 5 === 0) { // Only 20% of buildings have lights
                 const light = new THREE.PointLight(0x00ffff, 1, 300);
-                light.position.set(building.position.x, h, building.position.z);
+                light.position.set(dummy.position.x, h, dummy.position.z);
                 cityGroup.add(light);
             }
-            
-            cityGroup.add(building);
         }
+        
+        this.scene.add(cityMesh);
         this.scene.add(cityGroup);
 
         // 4. Beam to Sky
@@ -258,10 +321,11 @@ export class WorldGenerator {
         beam.position.copy(center);
         beam.position.y = 2500;
         this.scene.add(beam);
-        this.scene.add(beam);
+        
         this.props.push(beam);
         this.props.push(spire); // Track main structures too
-        this.props.push(cityGroup); // Track city
+        this.props.push(cityGroup); 
+        this.props.push(cityMesh);
     }
 
     clear() {

@@ -31,6 +31,17 @@ export class EntityManager {
         
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
+            
+            // Logic Culling (Performance)
+            // Skip updates if too far, UNLESS it's a Boss or specialized type
+            const dist = e.mesh.position.distanceTo(playerPos);
+            if (dist > 1000 && !e.isBoss) {
+                e.mesh.visible = false; // Cull visual logic too if needed (frustum does this, but this ensures)
+                continue; 
+            } else {
+                 e.mesh.visible = true;
+            }
+
             e.update(dt, playerPos);
             
             // Death cleanup
@@ -102,7 +113,6 @@ export class EntityManager {
             case 'EXPLOSIVE': enemy = new ExplosiveEnemy(scene, position); break;
             case 'LAUNCHER': enemy = new LauncherEnemy(scene, position, projectiles); break;
             case 'ED209': enemy = new ED209(scene, position, projectiles); break;
-            case 'ATOM': enemy = new AtomBoss(scene, this.game.player, position); break;
             case 'ATOM': enemy = new AtomBoss(scene, this.game.player, position); break;
             // CASTLE ENEMIES
             case 'SHIELD': enemy = new ShieldEnemy(scene, position); break;

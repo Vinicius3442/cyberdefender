@@ -61,9 +61,6 @@ export class ArsenalLevel {
         rackGroup.position.set(x, y, z);
 
         weapons.forEach((type, i) => {
-            // Visual Placeholder (Box or simplistic model)
-            // Or better: use WeaponFactory logic if possible, or just floating text for now?
-            // Let's make a box with text/color.
             const cfg = WeaponConfig[type];
             if (!cfg) return;
 

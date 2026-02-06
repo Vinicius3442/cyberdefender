@@ -121,10 +121,11 @@ export class Game {
         this.createSky();
 
         // Fog for Infinite Horizon (Matches ground color 0x8b5a2b)
-        // Density 0.0008 allows visibility up to ~1200 units, hiding the 2500 unit edge
-        this.scene.fog = new THREE.FogExp2(0x8b5a2b, 0.0008); 
+        // Linear Fog allows visibility of Castle (-2000) while hiding edge
+        // Start fading at 500, fully opaque at 4000 (Extended for Citadel)
+        this.scene.fog = new THREE.Fog(0x8b5a2b, 500, 4000); 
 
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setClearColor(0x8b5a2b); // Maintain background color match
@@ -141,6 +142,19 @@ export class Game {
         dirLight.castShadow = true;
         this.sunLight = dirLight; // Expose for levels
         this.scene.add(dirLight);
+
+        // --- STATS MONITOR (Lag Debug) ---
+        this.statsDiv = document.createElement('div');
+        Object.assign(this.statsDiv.style, {
+            position: 'absolute', top: '10px', left: '10px',
+            color: '#0f0', backgroundColor: 'rgba(0,0,0,0.5)',
+            padding: '5px', fontFamily: 'monospace', fontSize: '12px',
+            pointerEvents: 'none', zIndex: '9999'
+        });
+        document.body.appendChild(this.statsDiv);
+        this.lastStatsTime = 0;
+        this.frameCount = 0;
+        this.fps = 60;
 
         if (this.mode === 'BOSSRUSH') {
              console.log("INITIALIZING BOSS RUSH MODE: 2D ARSENAL");
@@ -188,7 +202,7 @@ export class Game {
             }
             
             // Actually, let's make it cleaner:
-            this.SKIP_INTRO = (this.mpParams && this.mpParams.skipIntro) || true; // Default TRUE for this session
+            this.SKIP_INTRO = this.mpParams && this.mpParams.skipIntro; // Respect CLI flag
             
             if (this.SKIP_INTRO) {
                 this.spawnPoint = new THREE.Vector3(0, startH + 5, 0); // Ground Spawn
@@ -337,7 +351,20 @@ export class Game {
                 }
             },
             "ammo": () => this.player.addAmmoToAll(1.0),
-            "god": () => { this.player.isInvincible = !this.player.isInvincible; alert("GOD MODE: " + this.player.isInvincible); }
+            "god": () => { this.player.isInvincible = !this.player.isInvincible; alert("GOD MODE: " + this.player.isInvincible); },
+            "adminhammer": () => {
+                if (this.waveManager) {
+                    let count = 0;
+                    this.waveManager.enemies.forEach(e => {
+                        if (!e.isDead && e.takeDamage) {
+                            e.takeDamage(9999);
+                            count++;
+                        }
+                    });
+                    console.log(`ADMIN HAMMER: ${count} enemies executed.`);
+                    if (this.player) this.createFloatingText(this.player.position, "HAMMER DOWN!", "#ff0000");
+                }
+            }
         };
 
         // Inventory Toggle
@@ -923,6 +950,30 @@ export class Game {
             return;
         }
 
+        // --- STATS UPDATE (1Hz) ---
+        const now = performance.now();
+        this.frameCount++;
+        if (now - this.lastStatsTime >= 1000) {
+            this.fps = this.frameCount;
+            this.frameCount = 0;
+            this.lastStatsTime = now;
+            
+            const info = this.renderer.info; // WebGL Info
+            const entityCount = this.entityManager ? this.entityManager.enemies.length : 0;
+            const projCount = this.projectiles.length;
+            const fogDist = this.scene.fog ? `${this.scene.fog.near}-${this.scene.fog.far}` : 'Off';
+            
+            this.statsDiv.innerHTML = `
+                FPS: ${this.fps}<br>
+                Entities: ${entityCount}<br>
+                Projectiles: ${projCount}<br>
+                DrawCalls: ${info.render.calls}<br>
+                Triangles: ${info.render.triangles}<br>
+                Fog: ${fogDist}<br>
+                Memory: ${window.performance && window.performance.memory ? Math.round(window.performance.memory.usedJSHeapSize / 1048576) + 'MB' : 'N/A'}
+            `;
+        }
+
         const dt = Math.min(this.clock.getDelta(), 0.1); // Clamp dt to prevent huge jumps
 
         // Allow updates if not paused (Input lock check handled inside entities or ignored)
@@ -946,7 +997,8 @@ export class Game {
                         this.skyUniforms.bottomColor.value.setHex(0x000510);
                         this.stars.material.opacity = 0.9;
                         this.scene.fog.color.setHex(0x000000);
-                        this.scene.fog.density = 0.0001;
+                        this.scene.fog.near = 10000; // No Fog in Space
+                        this.scene.fog.far = 20000;
                     } else if (h > 400) {
                         // RE-ENTRY: Red/Orange Glow, Shake
                         const t = (h - 400) / 600; // 0 to 1
@@ -954,7 +1006,10 @@ export class Game {
                         this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xff4400), 1-t);
                         this.stars.material.opacity = t; // Fade stars
                         this.scene.fog.color.lerp(new THREE.Color(0xff4400), 1-t);
-                        this.scene.fog.density = 0.002 + (1-t)*0.01;
+                        
+                        // Linear Fog Update
+                        this.scene.fog.near = 100;
+                        this.scene.fog.far = 2000;
                         
                         // Violent Shake
                         this.player.shakeIntensity = 0.2 + (1-t) * 0.5;
@@ -972,7 +1027,11 @@ export class Game {
                         this.skyUniforms.topColor.value.lerp(new THREE.Color(0x5599ff), 1-t);
                         this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xffaa66), 1-t);
                         this.scene.fog.color.lerp(new THREE.Color(0xddccaa), 1-t); // Dust color
-                        this.scene.fog.density = 0.015 * (1-t);
+                        
+                        // Linear Fog Restoration
+                        // As we land (h -> 0), fog returns to normal (500-3000)
+                        this.scene.fog.near = 500 * (1-t);
+                        this.scene.fog.far = 3000;
                         
                         this.player.shakeIntensity = 0.1 * t;
                     }
@@ -1412,6 +1471,39 @@ export class Game {
     }
 
     triggerReflectiveCutscene(e) {
+        // 1. Create Flash Element (if missing)
+        let flash = document.getElementById('flash-overlay');
+        if (!flash) {
+            flash = document.createElement('div');
+            flash.id = 'flash-overlay';
+            Object.assign(flash.style, {
+                position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+                backgroundColor: 'white', zIndex: '10000', opacity: '0', transition: 'opacity 3s',
+                pointerEvents: 'none'
+            });
+            document.body.appendChild(flash);
+        }
+
+        // 1.5 SAFETY: Prevent Death during Cutscene
+        this.player.isInvincible = true;
+        this.player.hp = this.player.maxHp; // Heal to full for visual
+        this.projectiles = []; // Clear all projectiles
+        if (this.entityManager) {
+             // Kill all other enemies to prevent them attacking while player is frozen
+             this.entityManager.enemies.forEach(e => {
+                 if (!e.isDead) {
+                     e.hp = 0;
+                     e.isDead = true;
+                     e.shouldRemove = true;
+                 }
+             });
+        }
+
+        // Force Player Look At Boss
+        if (e && e.detail && e.detail.position) {
+            this.player.camera.lookAt(e.detail.position);
+        }
+
         // Trigger Flash
         setTimeout(() => flash.style.opacity = '1', 50);
 

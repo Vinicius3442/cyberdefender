@@ -38,7 +38,13 @@ export class WaveManager {
 
             if (this.enemies.length === 0 && this.enemiesToSpawn === 0 && !this.waitingForBoss) {
                 this.waveInProgress = false;
-                this.game.showUpgradeScreen();
+                
+                // Skip Upgrade on Wave 10 (Cinematic Transition to Castle)
+                if (this.currentWave !== 10) {
+                    this.game.showUpgradeScreen();
+                } else {
+                    console.log("WAVE 10 COMPLETE. Skipping Upgrade for Cinematic.");
+                }
             }
 
             // Spawn Logic
@@ -130,7 +136,19 @@ export class WaveManager {
             }, 3000);
 
         } else {
-            const numEnemies = 2 + Math.floor(this.currentWave * 1.5);
+            // SCALING LOGIC
+            let numEnemies;
+            
+            if (this.currentWave > 10) {
+                // Castle Level: Harder enemies, so fewer total count to balance lag/difficulty
+                // Wave 11: 10 + 1 = 11 enemies (vs 18 previously)
+                // Wave 20: 10 + 10 = 20 enemies (vs 32 previously)
+                numEnemies = 8 + (this.currentWave - 10); 
+            } else {
+                // Wasteland: Mob swarm
+                numEnemies = 2 + Math.floor(this.currentWave * 1.5);
+            }
+            
             this.totalEnemiesInWave = numEnemies;
             this.enemiesToSpawn = numEnemies;
         }
@@ -162,11 +180,18 @@ export class WaveManager {
         if (this.game.currentLevelName === 'CASTLE' || (this.game.level && this.game.level.name === 'CASTLE')) {
              const rand = Math.random();
              // Castle Spawn Logic
-             if (rand < 0.3) return 'KNIGHT'; // 30% Knights
-             if (rand < 0.5) return 'ARCHER'; // 20% Archers
-             if (rand < 0.7) return 'SHIELD'; // 20% Shield Guards
-             if (rand < 0.8) return 'NINJA';  // 10% Ninjas
-             return 'TANK'; // 20% Heavy Backup (Tanks)
+             // Check limit for "Heavy" units (Tanks) to prevent lag/bugs
+             const tankCount = this.enemies.filter(e => e.constructor.name === 'TankEnemy').length;
+             
+             if (rand < 0.3) return 'KNIGHT';
+             if (rand < 0.5) return 'ARCHER';
+             if (rand < 0.7) return 'SHIELD';
+             if (rand < 0.85) return 'NINJA'; 
+             
+             // Cap Tanks to 3 active at once
+             if (tankCount < 3) return 'TANK'; 
+             
+             return 'KNIGHT'; // Fallback if tank cap reached
         }
 
         // WASTELAND (Default)

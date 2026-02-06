@@ -10,11 +10,11 @@ export class KnightEnemy extends Enemy {
         this.damage = 25; // High melee dmg
         this.scoreValue = 100;
         this.attackRange = 3.0; // Longer reach (Sword)
-        
-        this.createMesh();
     }
 
-    createMesh() {
+    _createMesh() {
+        const group = new THREE.Group();
+
         // Robotic Knight Styling
         const geometry = new THREE.BoxGeometry(0.8, 1.8, 0.6);
         const material = new THREE.MeshStandardMaterial({ 
@@ -22,19 +22,19 @@ export class KnightEnemy extends Enemy {
             metalness: 0.9,
             roughness: 0.2
         });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(this.position);
+        const body = new THREE.Mesh(geometry, material);
+        body.position.y = 0.9;
+        group.add(body);
         
         // Sword Arm
         const swordGeo = new THREE.BoxGeometry(0.1, 1.5, 0.1);
         const swordMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff });
         this.sword = new THREE.Mesh(swordGeo, swordMat);
-        this.sword.position.set(0.6, 0.5, 0.5);
+        this.sword.position.set(0.6, 1.4, 0.5);
         this.sword.rotation.x = Math.PI/4;
-        this.mesh.add(this.sword);
+        group.add(this.sword);
         
-        this.mesh.castShadow = true;
-        this.scene.add(this.mesh);
+        return group;
     }
 
     update(dt, playerPos) {
