@@ -114,8 +114,9 @@ export class RangedEnemy extends Enemy {
     }
 
     shoot(targetPos) {
-        // Aim at player center (approx 1.0 unit high) instead of feet
-        const aimTarget = targetPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+        // Aim at player center (approx 1.0 unit high)
+        // Player pos is Eye Level (~1.6). We want Chest (~1.2). So subtract 0.4.
+        const aimTarget = targetPos.clone().add(new THREE.Vector3(0, -0.4, 0));
 
         const direction = new THREE.Vector3()
             .subVectors(aimTarget, this.mesh.position)

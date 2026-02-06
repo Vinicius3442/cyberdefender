@@ -87,9 +87,9 @@ export class WorldGenerator {
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a, // Dark Grey
-            roughness: 0.9,
-            metalness: 0.2,
+            color: 0x8b5a2b, // Scorched Earth/Sand
+            roughness: 1.0,
+            metalness: 0.0,
             vertexColors: false
         });
 
@@ -142,13 +142,13 @@ export class WorldGenerator {
     createCyberTrees() {
         // Trees with glowing leaves (Neon style)
         const numTrees = 20;
-        const matTrunk = new THREE.MeshStandardMaterial({ color: 0x221100 });
+        const matTrunk = new THREE.MeshStandardMaterial({ color: 0x443322 }); // Dry Wood
         const matLeaves = new THREE.MeshStandardMaterial({ 
-            color: 0x00ff00, 
-            emissive: 0x00aa00, 
-            emissiveIntensity: 0.5,
-            transparent: true,
-            opacity: 0.8
+            color: 0xaa8844, // Dead leaves
+            emissive: 0x000000, 
+            emissiveIntensity: 0.0,
+            transparent: false,
+            opacity: 1.0
         });
 
         for (let i = 0; i < numTrees; i++) {

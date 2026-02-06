@@ -54,7 +54,7 @@ export const WeaponType = {
 export const WeaponConfig = {
     // --- PISTOLS ---
     [WeaponType.PISTOL]: {
-        damage: 20, fireRate: 0.3, spread: 0.01, magSize: 12, maxReserve: 60, projectileSpeed: 60, color: 0xffff00
+        damage: 20, fireRate: 0.3, spread: 0.01, magSize: 15, maxReserve: 75, projectileSpeed: 60, color: 0xffff00, reloadTime: 1.5
     },
     [WeaponType.REVOLVER]: {
         damage: 60, fireRate: 0.6, spread: 0.005, magSize: 6, maxReserve: 36, projectileSpeed: 80, color: 0xffaa00
@@ -105,7 +105,7 @@ export const WeaponConfig = {
 
     // --- RIFLES ---
     [WeaponType.RIFLE]: { // AK-47
-        damage: 25, fireRate: 0.2, spread: 0.02, magSize: 30, maxReserve: 90, projectileSpeed: 70, color: 0xffffaa
+        damage: 25, fireRate: 0.2, spread: 0.02, magSize: 30, maxReserve: 90, projectileSpeed: 70, color: 0xffffaa, reloadTime: 2.5
     },
     [WeaponType.FAMAS]: {
         damage: 22, fireRate: 0.15, spread: 0.01, magSize: 25, maxReserve: 100, projectileSpeed: 75, color: 0xffffaa, burst: 3
@@ -166,11 +166,11 @@ export const WeaponConfig = {
     },
 
     // --- MELEE ---
-    [WeaponType.SWORD]: { damage: 40, fireRate: 0.6, isMelee: true, range: 3.0, magSize: Infinity },
-    [WeaponType.KATANA]: { damage: 30, fireRate: 0.3, isMelee: true, range: 2.5, magSize: Infinity },
-    [WeaponType.AXE]: { damage: 80, fireRate: 1.2, isMelee: true, range: 3.5, magSize: Infinity },
-    [WeaponType.KNIFE]: { damage: 25, fireRate: 0.2, isMelee: true, range: 1.5, magSize: Infinity },
-    [WeaponType.BAT]: { damage: 35, fireRate: 0.5, isMelee: true, range: 2.0, magSize: Infinity },
-    [WeaponType.SLEDGEHAMMER]: { damage: 100, fireRate: 1.5, isMelee: true, range: 3.0, magSize: Infinity },
-    [WeaponType.LIGHTSABER]: { damage: 500, fireRate: 0.2, isMelee: true, range: 4.0, magSize: Infinity }
+    [WeaponType.SWORD]: { damage: 40, fireRate: 0.6, isMelee: true, range: 3.0, magSize: Infinity, color: 0xcccccc },
+    [WeaponType.KATANA]: { damage: 30, fireRate: 0.3, isMelee: true, range: 2.5, magSize: Infinity, color: 0xffffff },
+    [WeaponType.AXE]: { damage: 80, fireRate: 1.2, isMelee: true, range: 3.5, magSize: Infinity, color: 0x8b4513 },
+    [WeaponType.KNIFE]: { damage: 25, fireRate: 0.2, isMelee: true, range: 1.5, magSize: Infinity, color: 0x555555 },
+    [WeaponType.BAT]: { damage: 35, fireRate: 0.5, isMelee: true, range: 2.0, magSize: Infinity, color: 0xdeb887 },
+    [WeaponType.SLEDGEHAMMER]: { damage: 100, fireRate: 1.5, isMelee: true, range: 3.0, magSize: Infinity, color: 0x333333 },
+    [WeaponType.LIGHTSABER]: { damage: 500, fireRate: 0.2, isMelee: true, range: 4.0, magSize: Infinity, color: 0x00ff00 }
 };

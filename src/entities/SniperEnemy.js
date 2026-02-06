@@ -127,11 +127,16 @@ export class SniperEnemy extends Enemy {
     }
     
     shoot(targetPos) {
+        const spawnPos = this.gunBarrel.getWorldPosition(new THREE.Vector3());
+        // Aim at Chest (Player Head - 0.4)
+        const aimTarget = targetPos.clone().add(new THREE.Vector3(0, -0.4, 0));
+        
         const direction = new THREE.Vector3()
-            .subVectors(targetPos, this.mesh.position)
+            .subVectors(aimTarget, this.mesh.position) // Aim from Sniper BODY to Player
+            // Actually, aim from GUN BARREL to Player
+            .subVectors(aimTarget, spawnPos)
             .normalize();
 
-        const spawnPos = this.gunBarrel.getWorldPosition(new THREE.Vector3());
         spawnPos.add(direction.clone().multiplyScalar(1.5));
         
         const projectile = new Projectile(spawnPos, direction, false);

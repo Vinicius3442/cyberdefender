@@ -1,17 +1,29 @@
 import * as THREE from 'three';
+import { Utils } from './Utils.js';
 import { Input } from './Input.js';
 import { Player } from '../entities/Player.js';
 import { WaveManager } from '../systems/WaveManager.js';
 import { Collision } from '../systems/Collision.js';
 import { UpgradeManager } from '../systems/UpgradeManager.js';
 import { ParticleSystem } from '../systems/ParticleSystem.js';
-import { Chest } from '../entities/Chest.js';
 import { NetworkManager } from './NetworkManager.js';
 import { RemotePlayer } from '../entities/RemotePlayer.js';
+import { BootSequence } from '../ui/BootSequence.js';
+import { ShellMenu } from '../ui/ShellMenu.js';
+import { MeleeEnemy } from '../entities/MeleeEnemy.js';
+import { RangedEnemy } from '../entities/RangedEnemy.js';
+import { TankEnemy } from '../entities/TankEnemy.js';
+import { SniperEnemy } from '../entities/SniperEnemy.js';
+import { ExplosiveEnemy } from '../entities/ExplosiveEnemy.js';
+import { LauncherEnemy } from '../entities/LauncherEnemy.js';
 import { WeaponConfig } from './WeaponSystem.js';
 import { WeaponPickup } from '../entities/WeaponPickup.js';
 import { WorldGenerator } from './WorldGenerator.js';
-import { AtomBoss } from '../entities/bosses/AtomBoss.js';
+import { AtomBoss } from '../entities/Bosses/AtomBoss.js';
+import { ED209 } from '../entities/Bosses/ED209.js';
+import { ArsenalMenu } from '../ui/ArsenalMenu.js';
+// ArsenalLevel replaced by ArsenalMenu
+import { ArenaLevel } from '../levels/ArenaLevel.js';
 
 export class Game {
     constructor(mode = 'SP', mpParams = {}) {
@@ -38,11 +50,58 @@ export class Game {
         this.mpGameParams = {
             started: false
         };
+        this.interactables = [];
+        this.portals = [];
+
 
         this.init();
     }
 
+    }
+
+    dispose() {
+        // Stop Loop
+        this.renderer.setAnimationLoop(null);
+        
+        // Remove Listeners
+        window.removeEventListener('resize', this._onResize); 
+        document.removeEventListener('player-drop-item', this._onDropItem);
+        document.removeEventListener('spawn-pickup', this._onSpawnPickup);
+        document.removeEventListener('enemy-death', this._onEnemyDeath);
+        
+        // DOM Cleanup
+        const container = document.getElementById('game-container');
+        if (container && this.renderer) {
+            container.removeChild(this.renderer.domElement);
+        }
+        
+        // Cleanup Scene
+        if (this.scene) {
+            this.scene.traverse(object => {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(m => m.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            });
+        }
+    }
+
     init() {
+        // Read Params from Shell (Global)
+        if (window.GAME_PARAMS) {
+            console.log("GAME PARAMS DETECTED:", window.GAME_PARAMS);
+            if (window.GAME_PARAMS.bossQueue) {
+                this.pendingBoss = window.GAME_PARAMS.bossQueue; 
+            }
+            if (window.GAME_PARAMS.infiniteAmmo) {
+                 this.infiniteAmmoCheat = true;
+            }
+        }
+
         // Setup Three.js
         this.scene = new THREE.Scene();
         // Texture Loader
@@ -63,50 +122,121 @@ export class Game {
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
-        dirLight.shadow.camera.top = 20;
-        dirLight.shadow.camera.bottom = -20;
-        dirLight.shadow.camera.left = -20;
-        dirLight.shadow.camera.right = 20;
         this.scene.add(dirLight);
 
-        // World Generation
-        this.worldGen = new WorldGenerator(this.scene);
-        this.worldGen.generateLevel();
-        
-        // Expose terrain helper to scene for entities
-        this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
+        if (this.mode === 'BOSSRUSH') {
+             console.log("INITIALIZING BOSS RUSH MODE: 2D ARSENAL");
+             
+             // 1. Use Standard World for Stability
+             this.worldGen = new WorldGenerator(this.scene);
+             this.worldGen.generateLevel();
+             // Override terrain height helper (though WorldGen sets it usually? No, Game.js sets it below for SP)
+             this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
+
+             // 2. Set Safe Spawn (High up to prevent floor clip)
+             const startH = this.worldGen.getHeight(0, 0);
+             this.spawnPoint = new THREE.Vector3(0, startH + 10, 0);
+             
+             this.arsenalMenu = new ArsenalMenu(this, (loadout) => {
+                 this.startBossMatch(loadout);
+             });
+             this.arsenalMenu.show();
+             this.isPaused = true; 
+             // Force unlock after a tiny delay to override any auto-locks
+             setTimeout(() => document.exitPointerLock(), 100);
+
+        } else {
+            // SP / MP Normal
+            this.worldGen = new WorldGenerator(this.scene);
+            this.worldGen.generateLevel();
+            this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
+            
+            const startH = this.worldGen.getHeight(0, 0);
+            this.spawnPoint = new THREE.Vector3(0, startH + 20, 0); // Higher spawn for safety
+        }
 
         // Input
         this.input = new Input();
         this.input.onPause = () => this.togglePause();
         this.input.onInventory = () => this.toggleInventory();
-        this.input.onInteract = () => this.checkInteraction(); // Keep for future use (drops)
+        this.input.onInteract = () => this.checkInteraction(); 
+        
+        // Player Action Bindings
+        this.input.onAttack = () => { /* Attack handled in update loop */ };
+        this.input.onReload = () => { 
+            console.log("GAME: RELOAD KEY PRESSED"); 
+            if (this.isPaused && this.mode !== 'BOSSRUSH') return; // Allow some input if strictly UI, but generally paused blocks.
+            // Actually, if Paused for Arsenal, we don't want reload.
+            if (this.isPaused) return;
+
+            if (this.player) this.player.reload(); 
+        };
+        this.input.onDrop = () => { 
+            if (this.isPaused) return;
+            if (this.player) this.player.dropWeapon(); 
+        };
+        this.input.onSwitchWeapon = (slot) => { 
+            if (this.isPaused) return;
+            if (this.player) this.player.switchWeapon(slot); 
+        };
+        this.input.onInteract = () => { 
+            if (this.isPaused) return;
+            this.checkInteraction(); 
+        };
+        this.input.onZoom = (active) => { 
+            if (this.isPaused) return;
+            if (this.player) this.player.toggleScope(active); 
+        };
 
         // Player
         this.player = new Player(this.camera, this.input, this.scene, this.projectiles, this.playerSkinURL);
-
-        // Reference link
-        this.player.game = this; // Give player access to game for height check
+        this.player.game = this; 
+        
+        // Apply Spawn
+        this.player.position.copy(this.spawnPoint);
+        this.player.velocity.y = 0;
 
         // Systems
         this.particleSystem = new ParticleSystem(this.scene);
-        // Systems
-        this.particleSystem = new ParticleSystem(this.scene);
-        this.upgradeManager = new UpgradeManager(this); // Keep for Drop UI? Or remove?
+        this.upgradeManager = new UpgradeManager(this);
         
         if (this.mode === 'SP') {
             this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
+        } else if (this.mode === 'BOSSRUSH') {
+            // No wave manager initially. 
+            // We manage flow manually or via ArenaLevel logic later.
         }
+        
         this.collision = new Collision(this.player, this.enemies, this.projectiles, this.particleSystem);
 
         // Pass particle system to player for slash effects
         this.player.particleSystem = this.particleSystem;
 
         // Events
-        window.addEventListener('resize', () => this.onWindowResize(), false);
-        document.addEventListener('player-drop-item', (e) => {
-            this.spawnPickup(e.detail.position, e.detail.type);
-        });
+        this._onResize = () => this.onWindowResize();
+        this._onDropItem = (e) => this.spawnPickup(e.detail.position, e.detail.type);
+        this._onSpawnPickup = (e) => this.spawnPickup(e.detail.position, e.detail.type);
+        this._onEnemyDeath = (e) => {
+             if (e.detail.type === 'EXPLOSION') {
+                this.particleSystem.createExplosion(e.detail.position, 0xff0000, 20); // Visual only
+            }
+        };
+
+        window.addEventListener('resize', this._onResize, false);
+        document.addEventListener('player-drop-item', this._onDropItem);
+        document.addEventListener('spawn-pickup', this._onSpawnPickup);
+        document.addEventListener('enemy-death', this._onEnemyDeath);
+
+        // Initial Spawn Check (Cheats)
+        if (this.pendingBoss) {
+            setTimeout(() => {
+                const type = this.pendingBoss.toUpperCase();
+                console.log("EXECUTING CHEAT SPAWN:", type);
+                this.spawnEnemy(type);
+                this.player.createFloatingText(this.player.position, `CHEAT: ${type}`, "#ff00ff");
+                this.pendingBoss = null;
+            }, 2000); // Delay slightly for world load
+        }
         
         // Inventory Hover State
         this.hoveredSlot = -1;
@@ -123,7 +253,38 @@ export class Game {
         // KONAMI CODE CHEAT
         this.konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
         this.konamiIndex = 0;
+        
+        // DEV CHEATS (String Buffer)
+        this.cheatBuffer = "";
+        this.cheats = {
+            "ed209": () => this.spawnBoss('ED209'),
+            "worm": () => this.spawnBoss('DEVOURER'),
+            "eye": () => this.spawnBoss('OBSERVER'),
+            "dragon": () => this.spawnBoss('DRAGON'),
+            "nemesis": () => this.spawnBoss('NEMESIS'),
+            "ammo": () => this.player.addAmmoToAll(1.0),
+            "god": () => { this.player.isInvincible = !this.player.isInvincible; alert("GOD MODE: " + this.player.isInvincible); }
+        };
+
+        // Inventory Toggle
+        this.input.onInventory = () => {
+            const invMenu = document.getElementById('inventory-menu');
+            if (invMenu) {
+                if (invMenu.style.display === 'none') {
+                    invMenu.style.display = 'flex';
+                    document.exitPointerLock();
+                    this.isPreviewActive = true;
+                    this.renderInventory();
+                } else {
+                    invMenu.style.display = 'none';
+                    document.body.requestPointerLock();
+                    this.isPreviewActive = false;
+                }
+            }
+        };
+
         document.addEventListener('keydown', (e) => {
+            // Konami
             if (e.key === this.konamiCode[this.konamiIndex]) {
                 this.konamiIndex++;
                 if (this.konamiIndex === this.konamiCode.length) {
@@ -131,7 +292,22 @@ export class Game {
                     this.konamiIndex = 0;
                 }
             } else {
-                this.konamiIndex = 0; // Reset
+                this.konamiIndex = 0; 
+            }
+
+            // String Cheats (Only a-z)
+            if (e.key.length === 1 && /[a-z]/i.test(e.key)) {
+                this.cheatBuffer += e.key.toLowerCase();
+                if (this.cheatBuffer.length > 20) this.cheatBuffer = this.cheatBuffer.slice(-20);
+                
+                Object.keys(this.cheats).forEach(code => {
+                    if (this.cheatBuffer.endsWith(code)) {
+                        console.log("CHEAT ACTIVATED:", code);
+                        this.createFloatingText(this.player.position, "CHEAT: " + code.toUpperCase(), "#ff00ff");
+                        this.cheats[code]();
+                        this.cheatBuffer = ""; // Reset
+                    }
+                });
             }
         });
 
@@ -140,14 +316,13 @@ export class Game {
             this.initMultiplayer();
         }
 
-        // Start Logic (If SP, start immediately. If MP, wait in lobby?)
+        // Start Logic
+        // NOTE: this.animate() REMOVED. Must be called EXPLICITLY by consumer (main.js)
         if (this.mode === 'SP') {
             // Request Pointer Lock immediately handled in main.js
-            this.animate();
         } else {
             // MP starts in lobby state
             this.isInLobby = true;
-            this.animate(); // Logic loop runs to handle network, but player disabled
         }
     }
 
@@ -249,13 +424,13 @@ export class Game {
                 if (pauseMenu) pauseMenu.style.display = 'flex';
                 document.exitPointerLock();
             }
-
-            // Stop Inputs
-            this.input.keys.attack = false; 
+            
+            // Stop Moving Inputs
             this.input.keys.forward = false;
             this.input.keys.backward = false;
             this.input.keys.left = false;
             this.input.keys.right = false;
+            this.input.keys.attack = false;
             
         } else {
             // Unpause
@@ -300,159 +475,101 @@ export class Game {
         }
     }
 
-    renderInventory() {
-        // 1. Render Menu Grid
-        const grid = document.getElementById('inventory-grid');
-        grid.innerHTML = '';
-
-        // We use the fixed inventory array (9 slots) but maybe we want more for "Pack"?
-        // For now, let's just show the 9 slots repeated or just the single row?
-        // User asked for "Backpack" vs "Hotbar".
-        // Let's display the same 9 slots in the menu for now, but formatted nicely.
-        
-        this.player.inventory.forEach((type, i) => {
-            const div = document.createElement('div');
-            div.className = 'inv-slot';
-            if (i === this.player.currentSlot) div.classList.add('active');
-
-            if (type) {
-                const config = WeaponConfig[type];
-                if (config) {
-                    div.innerHTML = `<span class="inv-icon">${config.isMelee ? '⚔️' : '🔫'}</span>`;
-                    
-                    if (!config.isMelee && config.magSize !== Infinity) {
-                         const state = this.player.weaponState[type];
-                         div.innerHTML += `<span class="inv-count">${state ? state.reserve : 0}</span>`;
-                    }
-                    
-                    // Hover Info
-                    div.onmouseenter = () => {
-                        this.hoveredSlot = i;
-                        document.getElementById('inv-item-name').innerText = type;
-                        const stats = `DAMAGE: <span style="color:#f55">${config.damage}</span> | FIRE RATE: <span style="color:#5f5">${config.fireRate}s</span>\n` +
-                                      `MAG: ${config.magSize} | RESERVE: ${config.maxReserve} <br><br> <span style="color:#aaa; font-size: 0.8em">Press 'F' to Delete</span>`;
-                        document.getElementById('inv-item-desc').innerHTML = stats;
-                    };
-                    div.onmouseleave = () => {
-                        if (this.hoveredSlot === i) this.hoveredSlot = -1;
-                    };
-                }
-            } else {
-                 div.onmouseenter = () => {
-                    this.hoveredSlot = i;
-                    document.getElementById('inv-item-name').innerText = "EMPTY SLOT";
-                    document.getElementById('inv-item-desc').innerText = "No item equipped.";
-                 };
-                 div.onmouseleave = () => {
-                    if (this.hoveredSlot === i) this.hoveredSlot = -1;
-                 };
-            }
-
-            // Drag & Drop
-            div.draggable = true;
-            div.ondragstart = (e) => {
-                e.dataTransfer.setData('text/plain', i);
-                div.classList.add('dragging');
-            };
-            div.ondragend = () => {
-                div.classList.remove('dragging');
-            };
-            div.ondragover = (e) => {
-                e.preventDefault(); // Allow drop
-            };
-            div.ondrop = (e) => {
-                e.preventDefault();
-                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-                const toIndex = i;
-
-                if (fromIndex !== toIndex) {
-                    // Swap logic
-                    const temp = this.player.inventory[fromIndex];
-                    this.player.inventory[fromIndex] = this.player.inventory[toIndex];
-                    this.player.inventory[toIndex] = temp;
-                    
-                    // If we swapped the CURRENT slot, we must re-equip
-                    if (this.player.currentSlot === fromIndex || this.player.currentSlot === toIndex) {
-                        this.player.switchWeapon(this.player.currentSlot);
-                    }
-
-                    this.renderInventory();
-                }
-            };
-
-            // Click to Swap/Equip
-            div.onclick = () => {
-                this.player.switchWeapon(i);
-                this.renderInventory(); // Re-render both
-            };
-
-            grid.appendChild(div);
-        });
-
-        // 2. Render Hotbar (Always visible HUD)
+    renderInventory() { 
+        // Deprecated: Grid Inventory Removed logic.
+        // We only use Hotbar now.
+        // If anything calls this, redirect to Hotbar.
         this.renderHotbar();
-
-        // 3. Update Character Preview (2D Image)
-        const previewContainer = document.getElementById('player-preview-container');
-        previewContainer.innerHTML = '';
-        
-        const img = document.createElement('img');
-        if (this.player.skinURL) {
-            img.src = this.player.skinURL;
-        } else {
-            // Default Cute Face
-            // Generate a simple canvas for the face
-            const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 128;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffff00'; // Yellow
-            ctx.fillRect(0, 0, 128, 128);
-            ctx.fillStyle = '#000';
-            // Eyes
-            ctx.beginPath(); ctx.arc(40, 50, 10, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(88, 50, 10, 0, Math.PI * 2); ctx.fill();
-            // Smile
-            ctx.beginPath(); ctx.arc(64, 70, 30, 0, Math.PI, false); ctx.stroke();
-            img.src = canvas.toDataURL();
-        }
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'contain';
-        previewContainer.appendChild(img);
     }
+
+
 
     renderHotbar() {
         const container = document.getElementById('hotbar-container');
         if (!container) return;
+
+        // Optimization check
+        const currentState = this.player.inventory.join(',') + ':' + this.player.currentSlot;
+        if (this._lastHotbarState === currentState) return;
+        this._lastHotbarState = currentState;
+
         container.innerHTML = '';
 
+        // Fixed 3 Slots: Primary, Secondary, Melee
         this.player.inventory.forEach((type, i) => {
             const slot = document.createElement('div');
             slot.className = 'hotbar-slot';
             if (i === this.player.currentSlot) slot.classList.add('active');
 
-            // Key Number
-            slot.innerHTML = `<span class="hotbar-key">${i + 1}</span>`;
-
+            // Visuals
+            let content = `<span class="hotbar-key">${i + 1}</span>`;
+            
             if (type) {
                 const config = WeaponConfig[type];
                 if (config) {
-                    slot.innerHTML += config.isMelee ? '⚔️' : '🔫';
+                    const icon = config.isMelee ? '⚔️' : '🔫';
+                    content += `<div class="icon">${icon}</div><div class="name">${type.substring(0,3)}</div>`;
                 }
+            } else {
+                 content += `<div class="name" style="opacity:0.5; font-size:10px;">EMPTY</div>`;
             }
+            
+            slot.innerHTML = content;
             container.appendChild(slot);
         });
     }
 
-    spawnPickup(position, type = null) {
-        // Validation: Prevent "Hand" or invalid types
-        if (type && type !== 'AMMO' && !WeaponConfig[type]) {
-             console.warn("Attempted to spawn invalid pickup type:", type);
-             return;
+    checkInteraction() {
+        // Iterate backwards safely
+        for (let i = this.pickups.length - 1; i >= 0; i--) {
+            const p = this.pickups[i];
+            const d = p.mesh.position.distanceTo(this.player.position);
+            
+            if (d < pickupDist && d < minDist) {
+                minDist = d;
+                nearest = { pickup: p, index: i };
+            }
         }
 
-        // Limit Check: Max 3 items on ground
-        if (this.pickups.length >= 3) {
+        if (nearest) {
+            const p = nearest.pickup;
+            
+            if (p.type === 'AMMO') {
+                this.player.addAmmoToAll(0.3); // 30% refill
+                this.player.createFloatingText(p.mesh.position, "AMMO", "#00ff00");
+            } else if (p.type === 'HEALTH') {
+                this.player.hp = Math.min(this.player.hp + 25, this.player.maxHp);
+                this.player.createFloatingText(p.mesh.position, "+25 HP", "#ff0000");
+            } else {
+                // WEAPON
+                // Try to add or swap
+                this.player.addWeapon(p.type);
+            }
+
+            // Remove pickup
+            this.scene.remove(p.mesh);
+            this.pickups.splice(nearest.index, 1);
+            p.shouldRemove = true; // Flag for safety
+        }
+    }
+
+    spawnPickup(position, type = null) {
+        // Validation: Prevent "Hand" or invalid types
+        if (type && type !== 'AMMO' && type !== 'HEALTH') {
+            // Find matched casing
+            const entries = Object.entries(WeaponConfig);
+            const match = entries.find(([key, val]) => key.toUpperCase() === type.toUpperCase());
+            
+            if (match) {
+                type = match[0]; // Use correct Casing (e.g. 'Pistol')
+            } else {
+                console.warn("Attempted to spawn invalid pickup type:", type);
+                return;
+            }
+        }
+
+        // Limit Check: Max 15 items on ground (Was 3, too low)
+        if (this.pickups.length >= 15) {
             const old = this.pickups.shift(); // Remove oldest
             this.scene.remove(old.mesh);
         }
@@ -564,11 +681,24 @@ export class Game {
         }
     }
 
+    // ... (existing code)
+
+    clearProjectiles() {
+        // Remove all projectiles
+        for (const proj of this.projectiles) {
+            this.scene.remove(proj.mesh);
+        }
+        this.projectiles.length = 0; // Keep reference!
+    }
+
     beginGameplay() {
         this.isInLobby = false;
         this.mpGameParams.started = true;
+        
+        this.clearProjectiles(); // Safety clear
 
         document.getElementById('lobby-screen').style.display = 'none';
+        // ... (rest of function)
         document.body.requestPointerLock();
 
         document.getElementById('wave-info').style.display = 'none';
@@ -650,6 +780,131 @@ export class Game {
         document.getElementById('player-count').innerText = count;
     }
 
+    spawnProjectile(projectile) {
+        if (!projectile || !projectile.mesh) return;
+        // console.log("Spawning Projectile via Game");
+        this.scene.add(projectile.mesh);
+        this.projectiles.push(projectile);
+    }
+
+
+
+    // --- TERRAIN HELPER ---
+    getTerrainHeight(x, z) {
+        if (this.worldGen) {
+            return this.worldGen.getHeight(x, z);
+        } else if (this.scene.userData.getTerrainHeight) {
+            return this.scene.userData.getTerrainHeight(x, z);
+        } else {
+            return 0; // Default flat
+        }
+    }
+
+    spawnEnemy(type) {
+        if (!type) {
+            console.warn("spawnEnemy called with undefined type");
+            return;
+        }
+
+        const spawnPos2D = Utils.getRandomSpawnPosition(40, 15);
+        const position = { 
+            x: this.player.position.x + spawnPos2D.x, 
+            y: 0, 
+            z: this.player.position.z + spawnPos2D.z 
+        };
+
+        // Align with terrain
+        position.y = this.getTerrainHeight(position.x, position.z);
+
+        let enemy;
+        switch (type) {
+            case 'MELEE': enemy = new MeleeEnemy(this.scene, position); break;
+            case 'RANGED': enemy = new RangedEnemy(this.scene, position, this.projectiles); break; // Pass Game.projectiles directly
+            case 'TANK': enemy = new TankEnemy(this.scene, position); break;
+            case 'SNIPER': enemy = new SniperEnemy(this.scene, position, this.projectiles); break;
+            case 'EXPLOSIVE': enemy = new ExplosiveEnemy(this.scene, position); break;
+            case 'LAUNCHER': enemy = new LauncherEnemy(this.scene, position, this.projectiles); break;
+            case 'ED209': enemy = new ED209(this.scene, position, this.projectiles); break;
+            case 'ATOM': enemy = new AtomBoss(this.scene, this.player, position); break;
+            default: 
+                console.warn("Unknown enemy type:", type);
+                return;
+        }
+
+        if (enemy) {
+            enemy.isBoss = (type === 'ED209' || type === 'ATOM');
+            this.enemies.push(enemy);
+        }
+    }
+
+    spawnBoss(type) {
+        // OVERRIDE FOR BOSS RUSH/SPAWN: Use Fixed Positions if in Boss Rush to avoid overlap
+        if (this.mode === 'BOSSRUSH') {
+             // Cinematic Span: 50m in front of player start (0, 0, 0)
+             const spawnZ = -50;
+             const h = this.getTerrainHeight(0, spawnZ);
+             
+             // Create manually to force position
+             console.log(`SPAWNING BOSS ${type} AT FIXED POS (0, ${h}, ${spawnZ})`);
+             const pos = new THREE.Vector3(0, h + 2, spawnZ); // +2 for foot clearance
+             
+             let enemy;
+             // Manual switch because spawnEnemy uses random logic we want to bypass
+             switch (type) {
+                case 'ED209': enemy = new ED209(this.scene, pos, this.projectiles); break;
+                case 'ATOM': enemy = new AtomBoss(this.scene, this.player, pos); break;
+                default: 
+                    // Fallback to normal spawn
+                    this.spawnEnemy(type); 
+                    return;
+             }
+             
+             if (enemy) {
+                 enemy.isBoss = true;
+                 this.enemies.push(enemy);
+             }
+        } else {
+             // Normal Spawn
+             this.spawnEnemy(type);
+        }
+
+        // Optional: Boss UI triggers here if needed
+        const sub = document.getElementById('subtitle');
+        if (sub) {
+            sub.innerText = `WARNING: ${type} DETECTED`;
+            sub.style.opacity = 1;
+            setTimeout(() => sub.style.opacity = 0, 3000);
+        }
+    }
+
+    updateHUD() {
+        if (!this.player) return;
+
+        // 1. HP Bar
+        const hpPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
+        const hpBar = document.getElementById('hp-bar-fill');
+        const hpText = document.getElementById('hp-display');
+        
+        if (hpBar) {
+            hpBar.style.width = hpPercent + '%';
+            // Dynamic Color
+            if (hpPercent < 30) {
+                hpBar.style.backgroundColor = '#ff0000'; // Critical
+                hpBar.style.boxShadow = '0 0 10px #ff0000';
+            } else if (hpPercent < 60) {
+                hpBar.style.backgroundColor = '#ffaa00'; // Warning
+                hpBar.style.boxShadow = 'none';
+            } else {
+                hpBar.style.backgroundColor = '#00ff00'; // Fine
+                hpBar.style.boxShadow = 'none';
+            }
+        }
+        if (hpText) hpText.innerText = Math.ceil(this.player.hp);
+
+        // 2. Ammo UI (Sync continuously for reliability)
+        this.player.updateAmmoDisplay(); 
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
 
@@ -664,12 +919,15 @@ export class Game {
             return;
         }
 
-        const dt = this.clock.getDelta();
+        const dt = Math.min(this.clock.getDelta(), 0.1); // Clamp dt to prevent huge jumps
 
-        // Allow updates if locked OR if we want to debug (optional, but let's stick to lock for now)
-        if (this.input.isLocked || this.mode === 'MP') { // Allow update in MP even if unlocked momentarily? No, strict.
+        // Allow updates if not paused (Input lock check handled inside entities or ignored)
+        if (!this.isPaused) { 
             // Update Entities
             this.player.update(dt);
+            
+            // Update HUD
+            this.updateHUD();
 
             // MP Sync
             if (this.mode === 'MP' && this.network) {
@@ -716,8 +974,8 @@ export class Game {
                 }
             }
 
-            // Update Enemies (Only in SP)
-            if (this.mode === 'SP') {
+            // Update Enemies (SP & BOSSRUSH)
+            if (this.mode === 'SP' || this.mode === 'BOSSRUSH') {
                 for (let i = this.enemies.length - 1; i >= 0; i--) {
                     const e = this.enemies[i];
                     e.update(dt, this.player.position);
@@ -761,7 +1019,6 @@ export class Game {
 
             // Update Systems
             if (this.waveManager) this.waveManager.update(dt);
-            if (this.collision) this.collision.update();
             if (this.collision) this.collision.update(dt);
             this.particleSystem.update(dt);
             
@@ -822,7 +1079,28 @@ export class Game {
         
         if (healed > 0) {
             this.player.createFloatingText(this.player.position, `WAVE CLEARED: +${healed} HP`, "#00ff00");
-             document.getElementById('hp-display').innerText = Math.floor(this.player.hp);
+        }
+        
+        // Update HP
+        const hpPercent = (this.player.hp / this.player.maxHp) * 100;
+        const hpBar = document.getElementById('hp-bar-fill');
+        const hpText = document.getElementById('hp-display');
+        
+        hpBar.style.width = hpPercent + '%';
+        hpText.innerText = Math.ceil(this.player.hp);
+
+        // Dynamic Color
+        if (hpPercent < 30) {
+            hpBar.style.backgroundColor = '#ff0000'; // Critical
+            hpBar.style.boxShadow = '0 0 10px #ff0000';
+            // Scale effect?
+            hpBar.style.height = '100%'; 
+        } else if (hpPercent < 60) {
+            hpBar.style.backgroundColor = '#ffaa00'; // Warning
+            hpBar.style.boxShadow = 'none';
+        } else {
+            hpBar.style.backgroundColor = '#00ff00'; // Fine
+            hpBar.style.boxShadow = 'none';
         }
         
         const upgradeScreen = document.getElementById('upgrade-screen');
@@ -857,8 +1135,8 @@ export class Game {
         `;
 
         const uniforms = {
-            topColor: { value: new THREE.Color(0x000500) }, // Toxic Dark
-            bottomColor: { value: new THREE.Color(0x113311) }, // Toxic Green Horizon
+            topColor: { value: new THREE.Color(0x5599ff) }, // Bright Blue
+            bottomColor: { value: new THREE.Color(0xffaa66) }, // Orange/Dust Horizon
             offset: { value: 33 },
             exponent: { value: 0.6 }
         };
@@ -874,12 +1152,24 @@ export class Game {
         const sky = new THREE.Mesh(skyGeo, skyMat);
         this.scene.add(sky);
 
-        // Fog (Toxic Green)
-        this.scene.fog = new THREE.FogExp2(0x051505, 0.02);
+        // Fog (Dusty Haze)
+        this.scene.fog = new THREE.FogExp2(0xddccaa, 0.015);
 
-        // Stars
+        // Sun Light
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+        sun.position.set(100, 200, 50);
+        sun.castShadow = true;
+        this.scene.add(sun);
+        
+        // Ambient Light (Warm)
+        const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x444444, 0.6);
+        this.scene.add(hemiLight);
+
+        // Stars (Visible only high up or faint?) 
+        // Let's remove stars for day time or make them very faint
+        // or replace with "Dust Motes"
         const starGeo = new THREE.BufferGeometry();
-        const starCount = 1000;
+        const starCount = 500;
         const starPos = new Float32Array(starCount * 3);
         
         for(let i=0; i<starCount * 3; i+=3) {
@@ -938,7 +1228,44 @@ export class Game {
         setTimeout(() => div.remove(), 1000);
     }
 
+    // --- BOSS RUSH LOGIC ---
+    startBossMatch(loadout) {
+        console.log("GAME: Starting Boss Match with Loadout:", loadout);
+        
+        // 1. Equip Weapons
+        this.player.inventory = [];
+        this.player.currentSlot = 0;
+        
+        // Ensure Player has pickup method OR manually add to inventory
+        // Assuming Player.addItem(type) or direct inject
+        loadout.forEach(type => {
+             // Mock pickup
+             if (!this.player.inventory.includes(type)) {
+                 this.player.inventory.push(type);
+             }
+        });
+        
+        // If empty, give default
+        if (this.player.inventory.length === 0) this.player.inventory.push('Pistol');
+        
+        this.player.switchWeapon(0);
+
+        // 2. Unpause and Lock Mouse
+        this.isPaused = false;
+        document.body.requestPointerLock();
+        
+        // 3. Spawn Boss (Manual Queue for now)
+        this.spawnBossQueue();
+    }
+
+    spawnBossQueue() {
+        // Start with ED209
+        console.log("GAME: Spawning Boss ED209");
+        this.spawnEnemy('ED209');
+    }
+
     onWindowResize() {
+        if (!this.camera || !this.renderer) return;
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);

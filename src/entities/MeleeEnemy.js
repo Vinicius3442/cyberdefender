@@ -87,7 +87,7 @@ export class MeleeEnemy extends Enemy {
 
         // Custom Movement Logic
         const dist = this.mesh.position.distanceTo(playerPosition);
-        const attackRange = 2.0;
+        const attackRange = 3.0; // Increased to prevent clipping
 
         // Look at player
         this.mesh.lookAt(playerPosition.x, this.mesh.position.y, playerPosition.z);

@@ -38,10 +38,10 @@ export class Player {
         this.score = 0; // Initialize Score
         this.isDead = false;
 
-        // Fixed Inventory (9 Slots)
-        this.inventory = new Array(9).fill(null);
-        this.inventory[0] = WeaponType.PISTOL;
-        this.inventory[1] = WeaponType.SWORD;
+        // Fixed Inventory (3 Slots: Primary, Secondary, Melee)
+        this.inventory = new Array(3).fill(null);
+        this.inventory[0] = WeaponType.PISTOL; // Default Primary? Or Secondary?
+        this.inventory[2] = WeaponType.SWORD; // Melee fixed in slot 3
         
         this.currentSlot = 0;
         this.weaponState = {}; // Store ammo per weapon type
@@ -70,9 +70,10 @@ export class Player {
         
         // Spawn Protection
         this.isInvulnerable = true;
-        this.invulnerabilityTimer = 3.0; // 3 seconds grace period on spawn
+        this.invulnerabilityTimer = 5.0; // Increased to 5s to prevent spawn damage
+
         this.lastDamageTime = 0;
-        this.damageCooldown = 0.5; // Minimum 0.5s between hits from melee
+        this.damageCooldown = 0.2; // 200ms cooldown (allow 5 hits/sec)
 
         // Input callbacks
         this.input.onMouseMove = (dx, dy) => this._onMouseMove(dx, dy);
@@ -80,6 +81,7 @@ export class Player {
         this.input.onSwitchWeapon = (index) => this.switchWeapon(index);
         this.input.onReload = () => this.reload();
         this.input.onZoom = (active) => this.toggleScope(active);
+        this.input.onDrop = () => this.dropWeapon();
 
         // Setup Weapon Container
         this.weaponContainer.position.set(0.3, -0.3, -0.5);
@@ -95,6 +97,7 @@ export class Player {
         // Update Immunity
         if (this.invulnerabilityTimer > 0) {
             this.invulnerabilityTimer -= dt;
+            // console.log("Invulnerability Timer:", this.invulnerabilityTimer);
             if (this.invulnerabilityTimer <= 0) {
                 this.isInvulnerable = false;
                 this.createFloatingText(this.position, "SYSTEM READY", "#00ff00");
@@ -167,6 +170,10 @@ export class Player {
         if (this.isScoped) this.toggleScope(false);
 
         this.currentSlot = slotIndex;
+        
+        // Reset Reload State
+        this.isReloading = false;
+        
         const type = this.getCurrentWeaponType();
 
         // Update Visuals
@@ -192,6 +199,11 @@ export class Player {
 
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
+        
+        // Safety Check
+        if (!state) return;
+        if (typeof state.mag !== 'number' || isNaN(state.mag)) state.mag = config.magSize === Infinity ? 999 : config.magSize;
+        if (typeof state.reserve !== 'number' || isNaN(state.reserve)) state.reserve = config.maxReserve === Infinity ? 999 : config.maxReserve;
 
         const text = config.magSize === Infinity ? "∞" : `${state.mag} / ${state.reserve}`;
         document.getElementById('ammo-display').innerText = text;
@@ -223,30 +235,80 @@ export class Player {
     }
 
     reload() {
+        console.log("PLAYER: Reload Requested");
+        if (this.isReloading) {
+            console.log("PLAYER: Reload Ignored (Already Reloading)");
+            return;
+        }
+
         const type = this.getCurrentWeaponType();
-        if (!type) return;
+        if (!type) {
+            console.log("PLAYER: Reload Ignored (No Weapon)");
+            return;
+        }
 
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
-
-        if (config.magSize === Infinity) return;
-        if (state.mag === config.magSize) return; // Full mag
-        if (state.reserve <= 0) return; // No ammo
-
-        const needed = config.magSize - state.mag;
-        const amount = Math.min(needed, state.reserve);
-
-        state.mag += amount;
-        state.reserve -= amount;
         
-        this.updateAmmoDisplay();
+        if (!config || !state) {
+             console.log("PLAYER: Reload Ignored (Invalid Config/State)");
+             return;
+        }
 
-        // Visual feedback
+        if (config.magSize === Infinity) {
+             console.log("PLAYER: Reload Ignored (Infinite Mag)");
+             return;
+        }
+
+        if (state.mag >= config.magSize) {
+            console.log("PLAYER: Reload Ignored (Full Mag)");
+            this.createFloatingText(this.position, "FULL", "#ffffff");
+            return; 
+        } 
+        
+        if (state.reserve <= 0) {
+            console.log("PLAYER: Reload Ignored (No Reserve)");
+            this.createFloatingText(this.position, "NO AMMO", "#ff0000");
+            return;
+        }
+
+        // Start Reload
+        console.log(`PLAYER: Reload Started (${type})`);
+        this.isReloading = true;
+        this.createFloatingText(this.position, "RELOADING...", "#ffff00");
+
+        // Visual Feedback (Dip weapon)
         const model = this.weaponModels[type];
         if (model) {
-            model.rotation.x -= 0.5;
-            setTimeout(() => model.rotation.x += 0.5, 200);
+            model.rotation.x -= 0.8;
         }
+
+        // Delay
+        const reloadTime = (config.reloadTime || 1.5) * 1000;
+        
+        setTimeout(() => {
+            if (!this.game) return; // Game ended?
+            
+            // Logic
+            const needed = config.magSize - state.mag;
+            const amount = Math.min(needed, state.reserve);
+
+            state.mag += amount;
+            state.reserve -= amount;
+            
+            console.log(`PLAYER: Reload Complete. Added ${amount}. Mag: ${state.mag}, Reserve: ${state.reserve}`);
+
+            this.updateAmmoDisplay();
+            this.isReloading = false;
+            
+            // Restore visual
+            if (model) {
+                model.rotation.x += 0.8;
+            }
+            
+            this.createFloatingText(this.position, "READY", "#00ff00");
+
+        }, reloadTime);
     }
 
     attack() {
@@ -349,9 +411,24 @@ export class Player {
                 spreadDir.normalize();
             }
 
-            const spawnPos = this.camera.position.clone().add(spreadDir.clone().multiplyScalar(1.0));
+            // Aim Convergence Logic
+            const targetDist = 50; // Assume target is 50m away (or raycast if we had it)
+            const targetPoint = this.camera.position.clone().add(spreadDir.clone().multiplyScalar(targetDist));
 
-            const projectile = new Projectile(spawnPos, spreadDir, true);
+            // Visual Gun Offset (Right Handed)
+            // Ideally get from weaponModels[type] but it's local.
+            // Approx offset relative to camera:
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+            
+            // Default offset (0.3 right, -0.2 down, 0.5 forward)
+            const gunOffset = right.clone().multiplyScalar(0.2).add(up.clone().multiplyScalar(-0.2)).add(spreadDir.clone().multiplyScalar(0.5));
+            const spawnPos = this.camera.position.clone().add(gunOffset);
+
+            // Recalculate direction from Gun to Target
+            const finalDir = new THREE.Vector3().subVectors(targetPoint, spawnPos).normalize();
+            
+            const projectile = new Projectile(spawnPos, finalDir, true);
             projectile.damage = config.damage;
             projectile.velocity = spreadDir.clone().multiplyScalar(config.projectileSpeed || 20);
             projectile.mesh.material.color.setHex(config.color || 0xffff00);
@@ -391,16 +468,25 @@ export class Player {
                 projectile.mesh.lookAt(spawnPos.clone().add(spreadDir));
             }
 
-            this.scene.add(projectile.mesh);
-            this.projectiles.push(projectile);
+            if (this.game && this.game.spawnProjectile) {
+                this.game.spawnProjectile(projectile);
+            } else {
+                console.error("Game reference missing in Player, cannot spawn projectile");
+            }
         }
     }
 
     update(dt) {
         if (this.isDead) return;
+        
+        // Debug Heartbeat
+        if (!this.frameCount) this.frameCount = 0;
+        this.frameCount++;
+        if (this.frameCount % 100 === 0) console.log(`PLAYER HEARTBEAT: Pos ${this.position.y.toFixed(2)}`);
+
         if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
-        // Movement (Same as before)
+        // 1. Calculate Velocity based on Input
         const speed = this.speed;
         const moveDir = new THREE.Vector3();
 
@@ -421,34 +507,88 @@ export class Player {
             this.canJump = false;
         }
 
-        // Auto-Fire
-        if (this.input.keys.attack) {
-            this.attack();
-        }
-
+        // 2. Apply Velocity to Position (RESTORED MISSING CODE)
         this.position.x += this.velocity.x * dt;
         this.position.y += this.velocity.y * dt;
         this.position.z += this.velocity.z * dt;
 
-        // Ground Check
+        // 3. Ground / Terrain Collision
         let groundHeight = 0;
         if (this.game) {
             groundHeight = this.game.getTerrainHeight(this.position.x, this.position.z);
+        } else if (this.scene && this.scene.userData.getTerrainHeight) {
+            groundHeight = this.scene.userData.getTerrainHeight(this.position.x, this.position.z);
         }
-        const minHeight = groundHeight + 1.6;
+
+        const minHeight = groundHeight + 1.6; // Eye level
 
         if (this.position.y < minHeight) {
             this.position.y = minHeight;
             this.velocity.y = 0;
             this.canJump = true;
         }
-
+        
+        // Sync Camera
         this.camera.position.copy(this.position);
+
+        // Auto-Fire
+        if (this.input.keys.attack) {
+            if (this.isReloading) {
+                 // Prevent shooting
+            } else {
+                // Auto Reload if empty
+                const state = this.weaponState[this.inventory[this.currentSlot]];
+                if (state && state.ammo <= 0 && state.reserve > 0) {
+                    this.reload();
+                } else {
+                    this.attack();
+                }
+            }
+        }
+    }
+
+    reload() {
+        if (this.isReloading) return;
+        
+        const type = this.inventory[this.currentSlot];
+        const state = this.weaponState[type];
+        const config = WeaponConfig[type];
+        
+        if (!state || state.reserve <= 0 || state.ammo >= config.magSize) return;
+
+        this.isReloading = true;
+        
+        // UI Feedback
+        this.createFloatingText(this.position, "RELOADING...", "#ffff00");
+        
+        // Play Sound? (Later)
+
+        const time = (config.reloadTime || 2.0) * 1000;
+
+        setTimeout(() => {
+            if (this.isDead) return;
+            
+            // Calculate Refill
+            const needed = config.magSize - state.ammo;
+            const available = Math.min(needed, state.reserve);
+            
+            state.ammo += available; // Refill Mag
+            if (config.maxReserve !== Infinity) {
+                state.reserve -= available; // Deduct from Reserve
+            }
+
+            this.isReloading = false;
+            
+            // Update UI
+            if (this.game && this.game.renderHotbar) this.game.renderHotbar(); 
+            
+        }, time);
     }
 
     takeDamage(amount) {
         if (this.isDead) return;
-        if (this.isInvulnerable) return; // Spawn protection
+        // FORCE DISABLE GOD MODE FOR USER
+        // if (this.isInvulnerable) return; 
         
         // Cooldown check for rapid hits (unless amount is massive, e.g. explosion?)
         // Let's enforce cooldown for ALL damage to stop instakills
@@ -496,7 +636,7 @@ export class Player {
     die() {
         if (this.isDead) return;
         this.isDead = true;
-        document.exitPointerLock();
+        // document.exitPointerLock(); // Moved to end to prevent premature pause
 
         // 1. Initial Glitch & Freeze
         const hud = document.getElementById('ui-layer');
@@ -549,10 +689,15 @@ export class Player {
                 if (i === systems.length - 1) {
                     // Final Crash
                     setTimeout(() => {
+                        // Trigger Game Over UI FIRST so Input.js sees it open
+                        if (this.game && this.game.showGameOver) {
+                            this.game.showGameOver();
+                        }
+                        
+                        document.exitPointerLock(); 
                         corruption.style.display = 'none';
                         document.body.style.filter = 'none';
-                        this.showGameOver();
-                    }, 1500);
+                    }, 500); // Wait bit after last log
                 }
             }, sys.delay);
         });
@@ -584,70 +729,88 @@ export class Player {
     }
 
     addWeapon(type) {
-        if (!this.inventory.includes(type)) {
-            // Find first empty slot
-            const emptyIndex = this.inventory.indexOf(null);
-            if (emptyIndex !== -1) {
-                this.inventory[emptyIndex] = type;
-                this.switchWeapon(emptyIndex); // Auto-switch to new gun
-                this.createFloatingText(this.position, `PICKED UP ${type}`, "#00ff00");
-            } else {
-                // Inventory Full: SWAP current slot
-                const currentType = this.inventory[this.currentSlot];
-                if (currentType) {
-                    // Drop current
-                    // Calculate drop position (in front of player)
-                    const dropPos = this.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
-                    dropPos.y += 1;
-                    
-                    // We need access to Game to spawn pickup. 
-                    // Player doesn't have direct ref to Game, but has Scene.
-                    // We can cheat and attach a callback or event, OR use a Global/Utils helper if available.
-                    // Or... cleaner: Game passes a "spawnPickup" callback to Player?
-                    // Currently Game has `spawnPickup`.
-                    // Let's check constructor.
-                    // Constructor has `scene, projectiles`. No Game ref.
-                    
-                    // Workaround: We will emit a custom event on document
-                    const event = new CustomEvent('player-drop-item', { 
-                        detail: { type: currentType, position: dropPos } 
-                    });
-                    document.dispatchEvent(event);
-                }
+        if (!type) return;
+        
+        const config = WeaponConfig[type];
+        
+        // 1. Check if we already have it -> Refill Ammo
+        if (this.inventory.includes(type)) {
+            const state = this.weaponState[type];
+            if (state && config.magSize !== Infinity) {
+                // If maxReserve is Infinity, we don't need to add anything (or we add 0)
+                // If it is finite, we calculate logic.
                 
-                // Replace
-                this.inventory[this.currentSlot] = type;
+                const reserveCap = (config.maxReserve === Infinity) ? 9999 : config.maxReserve;
+                const addAmount = (config.maxReserve === Infinity) ? 0 : Math.floor(config.maxReserve * 0.5);
                 
-                // Reset State for new weapon
-                const cfg = WeaponConfig[type];
-                this.weaponState[type] = {
-                    mag: cfg.magSize,
-                    reserve: cfg.maxReserve,
-                    maxReserve: cfg.maxReserve
-                };
+                state.reserve = Math.min(state.reserve + addAmount, reserveCap);
                 
-                this.switchWeapon(this.currentSlot);
-                this.createFloatingText(this.position, `SWAPPED ${type}`, "#00ff00");
+                this.createFloatingText(this.position, `+AMMO ${type}`, "#00ffff");
+                this.updateAmmoDisplay();
+                return;
             }
+        }
+
+        // 2. Logic: Slot 1 or 2 (Indexes 0, 1)
+        // If Melee -> Force replace Slot 3 (Index 2)
+        if (config.isMelee) {
+            this.inventory[2] = type;
+            this._resetWeaponState(type);
+            this.createFloatingText(this.position, `EQUIPPED ${type}`, "#ffcc00");
+            // If currently holding melee, refresh
+            if (this.currentSlot === 2) this.switchWeapon(2);
+            return;
+        }
+
+        // Guns: Try Slot 0 (Primary) then Slot 1 (Secondary)
+        if (!this.inventory[0]) {
+            this.inventory[0] = type;
+            this._resetWeaponState(type);
+            this.switchWeapon(0);
+        } else if (!this.inventory[1]) {
+            this.inventory[1] = type;
+            this._resetWeaponState(type);
+            this.switchWeapon(1);
         } else {
-            // Refill ammo
-            if (this.weaponState[type]) {
-                const config = WeaponConfig[type];
-                if (config.magSize !== Infinity) {
-                    const amount = Math.floor(config.maxReserve * 0.5); // 50% refill
-                    const oldReserve = this.weaponState[type].reserve;
-                    this.weaponState[type].reserve = Math.min(this.weaponState[type].reserve + amount, this.weaponState[type].maxReserve);
-                    
-                    const added = this.weaponState[type].reserve - oldReserve;
-                    if (added > 0) {
-                        this.createFloatingText(this.position, `+${added} ${type} AMMO`, "#00ffff");
-                    } else {
-                        // Already full
-                        this.createFloatingText(this.position, `${type} FULL`, "#aaaaaa");
-                    }
-                    this.updateAmmoDisplay();
-                }
+            // BOTH FULL: Replace CURRENT slot (if not melee)
+            let slot = this.currentSlot;
+            if (slot === 2) slot = 0; // If holding melee, replace Primary default
+
+            // Drop old logic? 
+            // "User: substituir o slot 1 e 2" -> implies replacing.
+            // Let's drop the old one to be nice.
+            const oldType = this.inventory[slot];
+            if (oldType) {
+                // Emit Drop Event
+                const dropPos = this.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
+                dropPos.y += 0.5;
+                const event = new CustomEvent('player-drop-item', { 
+                     detail: { type: oldType, position: dropPos } 
+                });
+                document.dispatchEvent(event);
             }
+
+            this.inventory[slot] = type;
+            this._resetWeaponState(type);
+            this.switchWeapon(slot);
+            this.createFloatingText(this.position, `SWAPPED ${type}`, "#00ff00");
+        }
+    }
+
+    _resetWeaponState(type) {
+        const cfg = WeaponConfig[type];
+        this.weaponState[type] = {
+            mag: cfg.magSize,
+            reserve: cfg.maxReserve,
+            maxReserve: cfg.maxReserve
+        };
+       
+        // Ensure model exists
+        if (!this.weaponModels[type]) {
+             const model = WeaponFactory.createWeaponMesh(type);
+             model.visible = false;
+             this.weaponModels[type] = model;
+             this.weaponContainer.add(model); 
         }
     }
 
@@ -671,6 +834,30 @@ export class Player {
                 }
             }
         }
+    }
+
+    dropWeapon() {
+        // Can't drop Melee (Slot 2) or Hands (if empty)
+        if (this.currentSlot === 2) {
+            this.createFloatingText(this.position, "CAN'T DROP MELEE", "#ff0000");
+            return;
+        }
+
+        const type = this.inventory[this.currentSlot];
+        if (!type) return;
+
+        // Visual Drop calculation
+        const dropPos = this.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(1.5));
+        dropPos.y += 0.5;
+
+        // Emit Drop Event
+        const event = new CustomEvent('player-drop-item', { 
+            detail: { type: type, position: dropPos } 
+        });
+        document.dispatchEvent(event);
+
+        // Clear Slot
+        this.removeWeapon(this.currentSlot);
     }
 
     applyRecoil() {

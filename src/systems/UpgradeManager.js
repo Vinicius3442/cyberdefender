@@ -22,11 +22,11 @@ export class UpgradeManager {
         this.optionsContainer.innerHTML = '';
         this.charImgContainer.innerHTML = '';
 
-        // Render Character
-        // Render Character (2D Image)
+        // Render Character (Holographic style)
         if (this.game.player.skinURL) {
             const img = document.createElement('img');
             img.src = this.game.player.skinURL;
+            img.className = 'char-preview-img';
             this.charImgContainer.appendChild(img);
         } else {
             // Green Robot Face (Matrix Style)
@@ -56,37 +56,45 @@ export class UpgradeManager {
             
             const img = document.createElement('img');
             img.src = canvas.toDataURL();
-            img.style.border = "2px solid #4af626"; // Add border style
+            img.className = 'char-preview-img';
             this.charImgContainer.appendChild(img);
         }
 
         const options = this.generateOptions();
 
-        // Render Rows
+        // Render Cards
+        this.optionsContainer.className = 'upgrade-grid'; // Switch to grid
+        
         options.forEach(opt => {
-            const row = document.createElement('div');
-            row.className = 'upgrade-row';
+            const card = document.createElement('div');
+            card.className = 'upgrade-card';
             
-            // Current Value?
+            // Current Value
             let currentVal = opt.getCurrent ? opt.getCurrent(this.game.player) : '-';
             if (typeof currentVal === 'number' && !Number.isInteger(currentVal)) currentVal = currentVal.toFixed(1);
 
-            row.innerHTML = `
-                <div class="stat-info">
-                    <span class="stat-label">${opt.title}</span>
-                    <span class="stat-value">${currentVal}</span>
-                </div>
-                <div class="upgrade-action">
-                    <button class="upgrade-btn">UPGRADE</button>
-                </div>
+            // Icon Mapping (Simple emoji for now, or CSS classes)
+            const icons = {
+                'hp': '❤️',
+                'speed': '⚡',
+                'jump': '🚀',
+                'ammo': '🔋'
+            };
+            const icon = icons[opt.id] || '🔧';
+
+            card.innerHTML = `
+                <div class="card-icon">${icon}</div>
+                <div class="card-title">${opt.title}</div>
+                <div class="card-current">CURRENT: ${currentVal}</div>
+                <button class="card-btn">INSTALL UPGRADE</button>
             `;
 
-            const btn = row.querySelector('button');
+            const btn = card.querySelector('button');
             btn.onclick = () => {
                 this.selectUpgrade(opt);
             };
 
-            this.optionsContainer.appendChild(row);
+            this.optionsContainer.appendChild(card);
         });
     }
 
@@ -100,7 +108,13 @@ export class UpgradeManager {
             { 
                 id: 'hp', title: 'MAX HEALTH', 
                 getCurrent: (p) => p.maxHp, 
-                apply: (p) => { p.maxHp += 20; p.hp += 20; } 
+                apply: (p) => { 
+                    p.maxHp += 20; 
+                    p.hp += 20; 
+                    // Force UI Update
+                    const hpDisp = document.getElementById('hp-display');
+                    if (hpDisp) hpDisp.innerText = Math.floor(p.hp);
+                } 
             },
             { 
                 id: 'speed', title: 'MOVEMENT SPEED', 

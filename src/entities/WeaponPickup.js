@@ -19,12 +19,19 @@ export class WeaponPickup {
                  this.type = keys[Math.floor(Math.random() * keys.length)];
              }
         } else {
-            // Validate type exists
-            if (type !== 'AMMO' && !WeaponType[type]) {
-                console.warn("Invalid pickup type, defaulting to AMMO:", type);
-                this.type = 'AMMO';
-            } else {
+            // Case-Insensitive Validation
+            if (type === 'AMMO' || type === 'HEALTH') {
                 this.type = type;
+            } else {
+                const entries = Object.entries(WeaponType);
+                const match = entries.find(([key, val]) => val.toUpperCase() === type.toUpperCase() || key.toUpperCase() === type.toUpperCase());
+                
+                if (match) {
+                    this.type = match[1]; // Use value (e.g. 'Pistol')
+                } else {
+                    console.warn(`Invalid pickup type: '${type}', defaulting to AMMO.`);
+                    this.type = 'AMMO';
+                }
             }
         }
 

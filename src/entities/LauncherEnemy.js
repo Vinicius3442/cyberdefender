@@ -121,13 +121,21 @@ export class LauncherEnemy extends Enemy {
     }
 
     shoot(targetPos) {
+        // Aim at player center (Chest)
+        // Player pos is Eye Level (1.6). Chest is ~1.2. Offset: -0.4
+        const aimTarget = targetPos.clone().add(new THREE.Vector3(0, -0.4, 0));
+        
         const direction = new THREE.Vector3()
-            .subVectors(targetPos, this.mesh.position)
+            .subVectors(aimTarget, this.mesh.position)
             .normalize();
 
         // Fire from alternating pods? Both for now.
         const spawnPos = this.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)); // Center top
         spawnPos.add(direction.clone().multiplyScalar(1.0));
+
+        // Recalculate direction from Muzzle to Target
+        // Origin was from body center, causing parallax overshot
+        direction.subVectors(aimTarget, spawnPos).normalize();
 
         const projectile = new Projectile(spawnPos, direction, false);
         projectile.isExplosive = true;

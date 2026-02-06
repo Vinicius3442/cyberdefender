@@ -44,28 +44,23 @@ export class Collision {
             }
 
             // Sub-stepping for High Velocity Detection
-            const steps = 4; // Check 4 times per frame
+            const steps = 8; // Increased from 4 to 8 for fast bullets
             const stepDt = (this.dt || 0.016) / steps;
             
             for (let s = 0; s < steps; s++) {
                 if (proj.shouldRemove) break;
 
-                // Move manually for detection (actual movement happens in Projectile.update, this is predictive checking)
-                // Wait, Projectile.update ALREADY moved it. 
-                // We should check along the path from Previous to Current? 
-                // Or just move it here? No, Projectile.js handles movement.
-                // If Projectile.js moved it 20 units, we are checking AFTER the jump.
-                // Correct approach with standardized Projectile system:
-                // Let Collision system handle movement? No.
-                // Let's assume linear interpolation from (Current - Velocity*dt) to Current.
-                
+                // Simple check at interpolated position
                 const factor = (s + 1) / steps;
+                // We check backwards from current position to previous
+                // Actually, assuming projective moved logic is external, we check the path it JUST covered.
+                // If Projectile moved V * dt, we check along that ray.
                 const checkPos = proj.mesh.position.clone().sub(proj.velocity.clone().multiplyScalar(this.dt || 0.016).multiplyScalar(1 - factor));
                 
                 // Temp check box at this interpolated position
                 const projBox = new THREE.Box3().setFromCenterAndSize(
                     checkPos,
-                    new THREE.Vector3(0.2, 0.2, 0.2) // Small box for bullet
+                    new THREE.Vector3(0.5, 0.5, 0.5) // Slightly larger bullet box
                 );
 
                 if (proj.isPlayerProjectile) {
@@ -84,12 +79,24 @@ export class Collision {
                         }
                     }
                 } else {
+                    // Player Hitbox Fix
+                    // Player pos is at feet (0, 1.6, 0) usually? No, Player.js: "this.position = new THREE.Vector3(0, 1.6, 0);" 
+                    // AND update() keeps it at groundHeight + 1.6. So position is EYE LEVEL?
+                    // "groundHeight + 1.6" suggests position is 1.6m ABOVE ground.
+                    // So feet are at pos.y - 1.6.
+                    // Box center should be pos.y - 0.8 (mid body).
+                    // Size 1.8 height.
+                    const centerPos = this.player.position.clone();
+                    centerPos.y -= 0.8; 
+                    
                     const playerBox = new THREE.Box3().setFromCenterAndSize(
-                        this.player.position,
-                        new THREE.Vector3(0.5, 1.8, 0.5)
+                        centerPos,
+                        new THREE.Vector3(0.6, 1.8, 0.6)
                     );
 
                     if (Utils.checkCollision(projBox, playerBox)) {
+                        /* console.log("HIT PLAYER! Damage:", proj.damage); */
+                        // Hit Player
                         if (proj.isExplosive) {
                             this.createExplosion(checkPos, proj.explosionRadius, proj.damage, true);
                         } else {
@@ -99,8 +106,9 @@ export class Collision {
                         break;
                     }
                 }
-            }
-        }
+            } // End for steps
+        } // End for proj
+
 
         // 2. Sword vs Enemies
         if (this.player.isAttacking && this.player.getCurrentWeaponConfig().isMelee) {
@@ -125,8 +133,10 @@ export class Collision {
         }
 
         // 3. Enemies vs Player (Melee contact)
+        const centerPos = this.player.position.clone();
+        centerPos.y -= 0.8; // Fix: Lower box to covers body, not just head
         const playerBox = new THREE.Box3().setFromCenterAndSize(
-            this.player.position,
+            centerPos,
             new THREE.Vector3(0.5, 1.8, 0.5)
         );
 
@@ -135,7 +145,7 @@ export class Collision {
             const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
 
             if (Utils.checkCollision(playerBox, enemyBox)) {
-                if (enemy instanceof ExplosiveEnemy) {
+                if (enemy.isExplosive || enemy instanceof ExplosiveEnemy) {
                     this.createExplosion(enemy.mesh.position, 5.0, enemy.damage, true);
                     enemy.die();
                 } else {

@@ -31,13 +31,17 @@ export class Projectile {
         // We will enhance the DEFAULT mesh to be a glowing tracer for standard bullets.
         
         if (!this.mesh) {
-             // Elongated tracer for standard bullets
+             // Hitbox Fix: Use Sphere (Ball) for everything except special types
+             // User Request: "bolinhas pequenas"
              if (!this.isBFG && !this.isExplosive) {
-                 const traGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6);
-                 traGeo.rotateX(Math.PI / 2);
-                 material = new THREE.MeshBasicMaterial({ color: isPlayerProjectile ? 0xffff00 : 0xff0000 });
-                 this.mesh = new THREE.Mesh(traGeo, material);
-                 this.mesh.lookAt(this.mesh.position.clone().add(direction));
+                 const ballGeo = new THREE.SphereGeometry(0.2, 8, 8); // Slightly bigger for better hit
+                 material = new THREE.MeshBasicMaterial({ 
+                     color: isPlayerProjectile ? 0xffff00 : 0xff0000,
+                     toneMapped: false // Glow effect 
+                 });
+                 // Add simple glow (PointLight) if expensive? No, just emissive material looks good if we used Standard.
+                 // Basic material is self-illuminated.
+                 this.mesh = new THREE.Mesh(ballGeo, material);
              } else {
                  this.mesh = new THREE.Mesh(geometry, material);
              }

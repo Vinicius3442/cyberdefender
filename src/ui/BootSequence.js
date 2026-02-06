@@ -24,6 +24,7 @@ export class BootSequence {
 
     start() {
         this.container.style.display = 'block';
+        this.container.style.zIndex = '9999'; // Force top
         this.textElement.innerHTML = '';
         
         // Ensure shutters are visible and closed (removing open class just in case)
@@ -32,10 +33,11 @@ export class BootSequence {
             this.shutters.classList.remove('open');
         }
         
-        // Add skip listener
-        this.clickHandler = () => this.skip();
-        document.addEventListener('click', this.clickHandler);
-        document.addEventListener('keydown', this.clickHandler);
+        // Add skip listener with delay to prevent immediate skip from Shell interaction
+        setTimeout(() => {
+            document.addEventListener('click', this.clickHandler);
+            document.addEventListener('keydown', this.clickHandler);
+        }, 500);
 
         this.typeLogs(0);
     }

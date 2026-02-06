@@ -19,6 +19,7 @@ export class Input {
         this.onZoom = null;
         this.onInteract = null;
         this.onInventory = null;
+        this.onDrop = null;
 
         this._init();
     }
@@ -60,7 +61,13 @@ export class Input {
                 this.keys.interact = true;
                 if (this.onInteract) this.onInteract();
                 break;
-            case 'KeyR': if (this.onReload) this.onReload(); break;
+            case 'KeyG': 
+                if (this.onDrop) this.onDrop(); 
+                break;
+            case 'KeyR': 
+                console.log("INPUT: RAW R KEY DOWN. Handler exist?", !!this.onReload);
+                if (this.onReload) this.onReload(); 
+                break;
             case 'KeyP': if (this.onPause) this.onPause(); break;
             case 'KeyI': 
             case 'Tab':
@@ -142,11 +149,17 @@ export class Input {
             const isGameOver = gameOverScreen && gameOverScreen.style.display !== 'none';
 
             const invMenu = document.getElementById('inventory-menu');
-            const upgradeScreen = document.getElementById('upgrade-screen');
             const isInvOpen = invMenu && invMenu.style.display !== 'none';
+            const upgradeScreen = document.getElementById('upgrade-screen');
             const isUpgradeOpen = upgradeScreen && upgradeScreen.style.display !== 'none';
+            const pauseMenu = document.getElementById('pause-menu');
+            const isPauseOpen = pauseMenu && pauseMenu.style.display !== 'none';
 
-            if (!isMenuOpen && !isGameOver && !isInvOpen && !isUpgradeOpen) {
+
+            const corruptionOverlay = document.getElementById('corruption-overlay');
+            const isDead = corruptionOverlay && corruptionOverlay.style.display !== 'none';
+
+            if (!isMenuOpen && !isGameOver && !isInvOpen && !isUpgradeOpen && !isPauseOpen && !isDead) {
                 // We were playing, and got unlocked (user pressed ESC).
                 // Trigger Pause.
                 if (this.onPause) {

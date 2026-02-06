@@ -1,9 +1,3 @@
-import { MeleeEnemy } from '../entities/MeleeEnemy.js';
-import { RangedEnemy } from '../entities/RangedEnemy.js';
-import { TankEnemy } from '../entities/TankEnemy.js';
-import { SniperEnemy } from '../entities/SniperEnemy.js';
-import { ExplosiveEnemy } from '../entities/ExplosiveEnemy.js';
-import { LauncherEnemy } from '../entities/LauncherEnemy.js';
 import { Utils } from '../core/Utils.js';
 import * as THREE from 'three';
 
@@ -21,6 +15,8 @@ export class WaveManager {
         this.waveTimer = 0;
         this.totalEnemiesInWave = 0;
         this.enemiesToSpawn = 0;
+        this.enemiesKilled = 0;
+        this.maxEnemies = 20; // FIX: Define max enemies cap
         this.enemiesKilled = 0;
         this.waveActive = false;
         this.waveActive = false;
@@ -89,6 +85,11 @@ export class WaveManager {
         const waveDisplay = document.getElementById('wave-display');
         if (waveDisplay) waveDisplay.innerText = this.currentWave;
 
+        // Cleanup previous wave projectiles
+        if (this.game && this.game.clearProjectiles) {
+            this.game.clearProjectiles();
+        }
+
         // BOSS WAVE LOGIC
         if (this.currentWave % 10 === 0) {
             this.totalEnemiesInWave = 1;
@@ -133,51 +134,32 @@ export class WaveManager {
 
     spawnEnemy() {
         if (this.enemies.length >= this.maxEnemies) return;
-        if (this.enemiesToSpawn <= 0) return; // No more enemies to spawn for this wave
+        if (this.enemiesToSpawn <= 0) return; 
 
         // BOSS WAVE LOGIC
         if (this.currentWave % 10 === 0 && !this.bossSpawned) {
-             // Spawn Boss
-             this.game.spawnBoss(this.currentWave); // Assuming game has a spawnBoss method
+             this.game.spawnBoss(this.currentWave); 
              this.bossSpawned = true;
-             this.enemiesToSpawn--; // Decrement as boss is spawned
+             this.enemiesToSpawn--; 
              return;
         }
         
-        if (this.bossSpawned) return; // Don't spawn minions while boss is alive (or maybe yes?)
+        if (this.bossSpawned) return;
 
         const enemyType = this.getEnemyType();
-        this.game.spawnEnemy(enemyType); // Assuming game has a spawnEnemy method
+        this.game.spawnEnemy(enemyType); 
         this.enemiesToSpawn--;
     }
 
     getEnemyType() {
-        const spawnPos2D = Utils.getRandomSpawnPosition(40, 15); // Increased radius
-        const spawnPos = { 
-            x: this.player.position.x + spawnPos2D.x, 
-            y: 0, 
-            z: this.player.position.z + spawnPos2D.z 
-        };
-
         // Random Enemy Type based on weights
         const rand = Math.random();
-        let enemy;
-
-        // Simple weight system
-        if (rand < 0.3) {
-            enemy = new MeleeEnemy(this.scene, spawnPos);
-        } else if (rand < 0.5) {
-            enemy = new RangedEnemy(this.scene, spawnPos, this.player.projectiles);
-        } else if (rand < 0.6) {
-            enemy = new TankEnemy(this.scene, spawnPos);
-        } else if (rand < 0.8) { // 20% Explosive
-            enemy = new ExplosiveEnemy(this.scene, spawnPos);
-        } else if (rand < 0.9) {
-            enemy = new SniperEnemy(this.scene, spawnPos, this.player.projectiles);
-        } else {
-            enemy = new LauncherEnemy(this.scene, spawnPos, this.player.projectiles);
-        }
-
-        this.enemies.push(enemy);
+        
+        if (rand < 0.3) return 'MELEE';
+        if (rand < 0.5) return 'RANGED';
+        if (rand < 0.6) return 'TANK';
+        if (rand < 0.8) return 'EXPLOSIVE';
+        if (rand < 0.9) return 'SNIPER';
+        return 'LAUNCHER';
     }
 }

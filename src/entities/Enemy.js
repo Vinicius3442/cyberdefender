@@ -85,12 +85,12 @@ export class Enemy {
 
         // Skip flashing if already flashing to avoid color glitching
         if (!this.isFlashing) {
-            this.playAnimation('hit'); // NEW: Trigger hit anim
+            this.playAnimation('hit'); // New: Trigger hit anim
             
             this.isFlashing = true;
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    // Check if material supports emissive (Standard/Phong)
+                    // Check if material supports emissive
                     if (child.material.emissive) {
                         if (!child.userData.hasClonedMaterial) {
                             child.material = child.material.clone();
@@ -106,7 +106,7 @@ export class Enemy {
             });
 
             setTimeout(() => {
-                if (this.mesh) { // Check existence
+                if (this.mesh) { 
                     this.mesh.traverse((child) => {
                         if (child.isMesh && child.material && child.material.userData.originalEmissive !== undefined) {
                             child.material.emissive.setHex(child.material.userData.originalEmissive);
@@ -125,17 +125,80 @@ export class Enemy {
     die() {
         if (this.isDead) return;
         this.isDead = true;
-        this.playingDeathAnim = true;
-        this.playAnimation('die');
+        this.scoreValue = this.scoreValue || 100;
         
-        // Remove after animation (e.g. 1s - faster per user request)
+        // Loot
+        this.dropLoot();
+
+        // Dispatch Death Event
+        const event = new CustomEvent('enemy-death', { 
+            detail: { 
+                type: this.isExplosive ? 'EXPLOSION' : 'NORMAL', 
+                position: this.mesh.position 
+            } 
+        });
+        document.dispatchEvent(event);
+        
+        // Anim
+        this.playAnimation('die');
+        this.playingDeathAnim = true;
+
+        // Remove after animation
         setTimeout(() => {
-            this.shouldRemove = true; // Signal Game.js to remove
+            this.shouldRemove = true;
             if (this.scene && this.mesh && this.mesh.parent === this.scene) {
                 this.scene.remove(this.mesh);
             }
         }, 1000);
     }
+
+    dropLoot() {
+        // Drop Chance
+        let chance = 0.3; // 30% default
+        if (this.isBoss) chance = 1.0; // Boss always drops
+
+        if (Math.random() < chance) {
+            let dropType = 'AMMO';
+            
+            // Bosses drop Weapons or Health
+            if (this.isBoss) {
+                 const rand = Math.random();
+                 if (rand < 0.4) dropType = 'HEALTH';
+                 else if (rand < 0.7) dropType = 'AMMO'; // Big ammo?
+                 else dropType = 'RANDOM_WEAPON'; 
+            }
+            
+            // Specific overrides?
+            // e.g. Sniper drops Sniper Ammo? (Future)
+
+            // Emit Drop Event (Game.js listens)
+            // If RANDOM_WEAPON, we let WeaponPickup handle randomization, or pass specific?
+            // WeaponPickup handles 'RANDOM' if type is null.
+            
+            const dropPos = this.mesh.position.clone();
+            dropPos.y += 1.0;
+
+            // Cheat: accessing Game via global or event?
+            // Game.js has document listener 'player-drop-item' -> calls spawnPickup
+            // Let's reuse that or make a new one 'spawn-pickup'
+            // Game.js line 122: document.addEventListener('player-drop-item'...
+            // Let's reuse that for now, or add new one. 
+            // Better: 'spawn-pickup'
+            
+            // Wait, Game.js listens to 'player-drop-item'. 
+            // Let's dispatch 'spawn-pickup' and add listener in Game.js?
+            // Or just use 'player-drop-item' (misnamed but functional).
+            // Let's add listener to Game.js for 'spawn-pickup' for clarity.
+             const event = new CustomEvent('spawn-pickup', { 
+                detail: { 
+                    type: dropType === 'RANDOM_WEAPON' ? null : dropType, 
+                    position: dropPos 
+                } 
+            });
+            document.dispatchEvent(event);
+        }
+    }
+
 
     update(dt, playerPosition) {
         this.updateAnimations(dt);

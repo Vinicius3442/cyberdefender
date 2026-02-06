@@ -434,7 +434,7 @@ body {
 
 /* --- Restored Menu Styles --- */
 
-/* Inventory Menu */
+/* Inventory Menu - Server Theme */
 #inventory-menu {
     position: absolute;
     top: 50%;
@@ -442,19 +442,31 @@ body {
     transform: translate(-50%, -50%);
     width: 800px;
     height: 600px;
-    background: rgba(10, 20, 10, 0.95);
-    border: 2px solid var(--border-color);
+    background: #000;
+    border: 2px solid #0f0;
     display: flex;
     flex-direction: row;
-    z-index: 2000; /* Above HUD */
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-    display: none; /* Hidden by default */
+    z-index: 2000;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.15);
+    display: none;
+    font-family: 'Courier New', monospace;
+}
+
+#inventory-menu::before {
+    content: 'ROOT@SYSTEM:~/INVENTORY';
+    position: absolute;
+    top: -24px; left: -2px;
+    background: #0f0;
+    color: #000;
+    padding: 2px 10px;
+    font-weight: bold;
+    font-size: 14px;
 }
 
 #inventory-left {
     flex: 2;
     padding: 20px;
-    border-right: 1px solid #333;
+    border-right: 1px solid #050;
     display: flex;
     flex-direction: column;
 }
@@ -470,55 +482,59 @@ body {
 .inv-slot {
     width: 80px;
     height: 80px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #444;
+    background: #000;
+    border: 1px dashed #050;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
-    transition: all 0.2s;
+    transition: all 0.1s;
 }
 
 .inv-slot:hover {
-    border-color: var(--hud-highlight);
-    background: rgba(0, 50, 0, 0.3);
+    border-color: #0f0;
+    background: #001100;
+    box-shadow: inset 0 0 10px #0f0;
 }
 
 .inv-slot.active {
-    border-color: #ffd700;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+    border: 2px solid #0f0;
+    background: #002200;
 }
 
 .inv-item-icon {
     width: 60px;
     height: 60px;
     object-fit: contain;
+    filter: drop-shadow(0 0 2px #0f0);
 }
 
 .inv-count {
     position: absolute;
     bottom: 2px;
     right: 5px;
-    font-family: var(--font-ui);
     font-size: 12px;
-    color: #fff;
+    color: #0f0;
 }
 
 #inventory-info {
     height: 100px;
-    border-top: 1px solid #333;
+    border-top: 1px solid #050;
     padding-top: 10px;
     margin-top: 10px;
+    color: #0f0;
+    font-size: 14px;
 }
 
 #inventory-right {
     flex: 1;
     padding: 20px;
-    background: rgba(0,0,0,0.3);
+    background: #000500;
     display: flex;
     flex-direction: column;
     align-items: center;
+    border-left: 1px solid #0f0; /* Double border effect */
 }
 
 #player-preview-container {
@@ -532,80 +548,171 @@ body {
     justify-content: center;
 }
 
-/* Upgrade Screen */
+/* Upgrade Screen - Linux Server Terminal Style */
 #upgrade-screen {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #000;
     z-index: 3000;
     display: flex;
     align-items: center;
     justify-content: center;
     pointer-events: auto;
     display: none;
+    font-family: 'Courier New', monospace;
 }
 
 #upgrade-container {
-    width: 900px;
-    height: 600px;
-    background: var(--panel-bg);
-    border: 2px solid var(--hud-highlight);
+    width: 1000px;
+    height: 700px;
+    background: #000;
+    border: 2px solid #0f0;
     display: flex;
-    box-shadow: 0 0 30px rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+    position: relative;
+}
+
+/* Header Bar */
+#upgrade-container::after {
+    content: 'ROOT@SYSTEM:~/UPGRADES';
+    position: absolute;
+    top: -24px;
+    left: 0;
+    background: #0f0;
+    color: #000;
+    padding: 2px 10px;
+    font-weight: bold;
+    font-size: 14px;
 }
 
 #upgrade-character-view {
     flex: 1;
     padding: 20px;
-    border-right: 2px solid var(--border-color);
+    border-right: 1px dashed #0f0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+}
+
+#upgrade-character-view h2 {
+    color: #0f0;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #0f0;
+    width: 100%;
+    text-align: center;
+}
+
+.char-preview-img {
+    width: 200px;
+    height: 200px;
+    border: 1px solid #0f0;
+    image-rendering: pixelated;
+    background: #001100;
+    margin-bottom: 20px;
 }
 
 #upgrade-stats-view {
-    flex: 1.5;
-    padding: 40px;
+    flex: 2;
+    padding: 20px;
     display: flex;
     flex-direction: column;
 }
 
-.upgrade-option {
-    background: rgba(0, 20, 0, 0.5);
-    border: 1px solid var(--border-color);
+#upgrade-stats-view h2 {
+    color: #0f0;
+    margin-bottom: 20px;
+    text-align: left;
+    font-size: 24px;
+    border-bottom: 1px solid #0f0;
+    width: 100%;
+}
+
+.upgrade-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    overflow-y: auto;
+    padding-right: 10px;
+    max-height: 550px;
+}
+
+/* Custom Scrollbar */
+.upgrade-grid::-webkit-scrollbar { width: 10px; }
+.upgrade-grid::-webkit-scrollbar-track { background: #001100; border-left: 1px solid #0f0; }
+.upgrade-grid::-webkit-scrollbar-thumb { background: #0f0; }
+
+.upgrade-card {
+    background: #000;
+    border: 1px solid #050;
     padding: 15px;
-    margin-bottom: 15px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    transition: all 0.2s;
-}
-
-.upgrade-option:hover {
-    background: rgba(0, 60, 0, 0.5);
-    border-color: var(--hud-highlight);
-}
-
-.upgrade-btn {
-    background: var(--hud-highlight);
-    color: #000;
-    border: none;
-    padding: 10px 20px;
-    font-family: var(--font-main);
+    flex-direction: column;
+    align-items: flex-start;
     cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-    font-weight: bold;
-    box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
+    transition: all 0.1s;
 }
 
-.upgrade-btn:hover {
+.upgrade-card:hover {
+    border-color: #0f0;
+    background: #001100;
+    box-shadow: 4px 4px 0 #0f0;
+    transform: translate(-2px, -2px);
+}
+
+.card-icon {
+    font-size: 24px;
+    margin-bottom: 10px;
+    color: #0f0;
+}
+
+.card-title {
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+.card-current {
+    color: #0a0;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.card-btn {
+    background: #0f0;
+    border: none;
+    color: #000;
+    padding: 5px 10px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 100%;
+    margin-top: auto;
+    font-family: 'Courier New', monospace;
+}
+
+.card-btn:hover {
     background: #fff;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
-    transform: scale(1.05);
+}
+
+#btn-skip-upgrade {
+    border: 1px solid #f00;
+    color: #f00;
+    background: transparent;
+    padding: 10px 40px;
+    margin-top: 20px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    align-self: flex-start;
+}
+#btn-skip-upgrade:hover {
+    background: #f00;
+    color: #000;
 }
 
 /* Pause Menu - Ensure High Z */

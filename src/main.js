@@ -33,14 +33,16 @@ document.addEventListener('mousemove', (e) => {
 // Logic moved to ShellMenu / Neofetch (Text only for now) or removed.
 // The old DOM elements #leaderboard-list and #champion-display do not exist.
 
-// --- Start Game ---
 // Initialize Shell Menu
-// Initialize Shell Menu
+const startShell = () => {
+    const shellMenu = new ShellMenu((name, mode) => {
+        // Callback when 'game start' is run (after Boot Sequence inside ShellMenu)
+        startGame(name, mode);
+    });
+};
 
-const shellMenu = new ShellMenu((name) => {
-    // Callback when 'game start' is run
-    startGame(name);
-});
+// Start directly with Shell
+startShell();
 
 // Remove old listeners
 // btnPlay.addEventListener... removed
@@ -54,21 +56,33 @@ if (btnResume) {
     });
 }
 
-const startGame = (playerName) => {
-    // Hide UI handled by ShellMenu/BootSequence
-    // startScreen.style.display = 'none'; // Removed
-
+const startGame = (playerName, mode = 'SP') => {
     // Lock Pointer
     document.body.requestPointerLock();
 
+    // Check if we need to restart (e.g. switch mode)
+    if (gameInstance) {
+        console.log("Restarting Game Instance...");
+        // Cleanup old game
+        if (gameInstance.dispose) {
+            gameInstance.dispose();
+        } else {
+            // Fallback nuclear option
+             const container = document.getElementById('game-container');
+             while (container.firstChild) {
+                 container.removeChild(container.firstChild);
+             }
+        }
+        gameInstance = null;
+    }
+
     // Start Game
     if (!gameInstance) {
-        gameInstance = new Game('SP', { name: playerName, skin: null });
-    } else {
-        // Reset if needed, or just unpause? 
-        // For now, reload page is safer for full reset, but let's try to reuse if allowed.
-        // Actually Game.js might not support restart easily. 
-        // Game Over screen usually has "location.reload()".
+        // Create Game
+        gameInstance = new Game(mode, { name: playerName, skin: null });
+        
+        // Start Loop - EXPLICIT CALL REQUIRED NOW
+        gameInstance.animate();
     }
 };
 

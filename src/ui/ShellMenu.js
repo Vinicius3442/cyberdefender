@@ -198,18 +198,42 @@ export class ShellMenu {
                 this.startGame();
                 break;
                 
+            case 'bossrush':
+                this.print("INITIALIZING BOSS RUSH ARENA...");
+                this.startGame('BOSSRUSH');
+                break;
+
+            case 'spawn':
+                const bossName = args[0];
+                if (bossName === 'ed209' || bossName === 'worm') {
+                    this.print(`QUEUED DEPLOYMENT: ${bossName.toUpperCase()}`);
+                    // We need to pass this to Game start...
+                    // Store in a global or static param?
+                    window.GAME_PARAMS = window.GAME_PARAMS || {};
+                    window.GAME_PARAMS.bossQueue = bossName;
+                } else {
+                    this.print("Unknown entity. Try: ed209, worm");
+                }
+                break;
+
+            case 'ammo':
+                window.GAME_PARAMS = window.GAME_PARAMS || {};
+                window.GAME_PARAMS.infiniteAmmo = true;
+                this.print("CHEAT ACTIVE: Infinite Ammo");
+                break;
+
             default:
                 if (raw.trim()) this.print(`Command not found: ${cmd}`);
         }
     }
     
-    startGame() {
+    startGame(mode = 'SP') {
         this.active = false; // Stop face anim
         this.shellContainer.style.display = 'none';
         
         // Trigger Boot Sequence via callback
         const bootSeq = new BootSequence(() => {
-            this.startGameCallback(this.playerName);
+            this.startGameCallback(this.playerName, mode);
         });
         bootSeq.start();
     }
