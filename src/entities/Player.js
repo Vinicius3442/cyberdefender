@@ -69,8 +69,10 @@ export class Player {
         this.camera.rotation.order = 'YXZ';
         
         // Spawn Protection
+        // Spawn Protection
+        // Spawn Protection
         this.isInvulnerable = true;
-        this.invulnerabilityTimer = 5.0; // Increased to 5s to prevent spawn damage
+        this.invulnerabilityTimer = 3.0; // Increased to 3s for safer load times
 
         this.lastDamageTime = 0;
         this.damageCooldown = 0.2; // 200ms cooldown (allow 5 hits/sec)
@@ -78,10 +80,8 @@ export class Player {
         // Input callbacks
         this.input.onMouseMove = (dx, dy) => this._onMouseMove(dx, dy);
         this.input.onAttack = () => this.attack();
-        this.input.onSwitchWeapon = (index) => this.switchWeapon(index);
-        this.input.onReload = () => this.reload();
-        this.input.onZoom = (active) => this.toggleScope(active);
-        this.input.onDrop = () => this.dropWeapon();
+        // REMOVED: onSwitchWeapon, onReload, onZoom, onDrop handled by Game.js to respect Paused State
+
 
         // Setup Weapon Container
         this.weaponContainer.position.set(0.3, -0.3, -0.5);
@@ -93,35 +93,7 @@ export class Player {
         this.switchWeapon(0);
     }
 
-    update(dt, isMoving) {
-        // Update Immunity
-        if (this.invulnerabilityTimer > 0) {
-            this.invulnerabilityTimer -= dt;
-            // console.log("Invulnerability Timer:", this.invulnerabilityTimer);
-            if (this.invulnerabilityTimer <= 0) {
-                this.isInvulnerable = false;
-                this.createFloatingText(this.position, "SYSTEM READY", "#00ff00");
-            }
-        }
 
-        // Update Weapon Position (Bobbing)
-        this._updateWeaponModel(dt, isMoving);
-        
-        // Recoil Recovery
-        if (this.recoilRecovery > 0) {
-            const recovery = 2.0 * dt; // Speed of return
-            this.camera.rotation.x -= Math.min(recovery, this.recoilRecovery);
-            this.recoilRecovery = Math.max(0, this.recoilRecovery - recovery);
-        }
-        
-        // Screen Shake
-        if (this.shakeTime > 0) {
-            this.shakeTime -= dt;
-            const rx = (Math.random() - 0.5) * this.shakeIntensity;
-            const ry = (Math.random() - 0.5) * this.shakeIntensity;
-            this.camera.position.add(new THREE.Vector3(rx, ry, 0)); // Don't shake Z (depth) too much
-        }
-    }
 
     _loadSkin(url) {
         // Stashed for later use (e.g. arm meshes)
@@ -236,38 +208,26 @@ export class Player {
 
     reload() {
         console.log("PLAYER: Reload Requested");
+        // Block if already reloading
         if (this.isReloading) {
             console.log("PLAYER: Reload Ignored (Already Reloading)");
             return;
         }
 
         const type = this.getCurrentWeaponType();
-        if (!type) {
-            console.log("PLAYER: Reload Ignored (No Weapon)");
-            return;
-        }
+        if (!type) return;
 
         const config = WeaponConfig[type];
         const state = this.weaponState[type];
         
-        if (!config || !state) {
-             console.log("PLAYER: Reload Ignored (Invalid Config/State)");
-             return;
-        }
-
-        if (config.magSize === Infinity) {
-             console.log("PLAYER: Reload Ignored (Infinite Mag)");
-             return;
-        }
-
+        // Validation
+        if (!config || !state) return;
+        if (config.magSize === Infinity) return;
         if (state.mag >= config.magSize) {
-            console.log("PLAYER: Reload Ignored (Full Mag)");
             this.createFloatingText(this.position, "FULL", "#ffffff");
             return; 
         } 
-        
         if (state.reserve <= 0) {
-            console.log("PLAYER: Reload Ignored (No Reserve)");
             this.createFloatingText(this.position, "NO AMMO", "#ff0000");
             return;
         }
@@ -277,26 +237,66 @@ export class Player {
         this.isReloading = true;
         this.createFloatingText(this.position, "RELOADING...", "#ffff00");
 
+        // UI Timer Setup
+        let reloadUI = document.getElementById('reload-timer');
+        if (!reloadUI) {
+            reloadUI = document.createElement('div');
+            reloadUI.id = 'reload-timer';
+            reloadUI.style.position = 'absolute';
+            reloadUI.style.top = '60%'; 
+            reloadUI.style.left = '50%';
+            reloadUI.style.transform = 'translate(-50%, -50%)';
+            reloadUI.style.color = '#ffff00';
+            reloadUI.style.fontFamily = 'Arial, sans-serif';
+            reloadUI.style.fontSize = '24px';
+            reloadUI.style.fontWeight = 'bold';
+            reloadUI.style.textShadow = '1px 1px 2px black';
+            reloadUI.style.pointerEvents = 'none';
+            document.body.appendChild(reloadUI);
+        }
+        reloadUI.style.display = 'block';
+
+        const totalTime = (config.reloadTime || 2.0); // seconds
+        let remaining = totalTime;
+
+        // Animate Timer
+        // Use a unique ID for the interval to clear it safely
+        if (this.reloadInterval) clearInterval(this.reloadInterval);
+        
+        this.reloadInterval = setInterval(() => {
+            if (!this.isReloading || this.isDead) {
+                if (this.reloadInterval) clearInterval(this.reloadInterval);
+                reloadUI.style.display = 'none';
+                return;
+            }
+            remaining -= 0.1;
+            if (remaining < 0) remaining = 0;
+            reloadUI.innerText = `RELOAD ${remaining.toFixed(1)}s`;
+        }, 100);
+
         // Visual Feedback (Dip weapon)
         const model = this.weaponModels[type];
         if (model) {
             model.rotation.x -= 0.8;
         }
 
-        // Delay
-        const reloadTime = (config.reloadTime || 1.5) * 1000;
-        
         setTimeout(() => {
+            if (this.reloadInterval) clearInterval(this.reloadInterval);
+            reloadUI.style.display = 'none';
+
+            if (this.isDead) return;
             if (!this.game) return; // Game ended?
             
             // Logic
             const needed = config.magSize - state.mag;
-            const amount = Math.min(needed, state.reserve);
-
-            state.mag += amount;
-            state.reserve -= amount;
+            const available = Math.min(needed, state.reserve);
             
-            console.log(`PLAYER: Reload Complete. Added ${amount}. Mag: ${state.mag}, Reserve: ${state.reserve}`);
+            state.ammo += available; // Refill Mag
+            if (config.maxReserve !== Infinity) {
+                state.reserve -= available; // Deduct from Reserve
+            }
+
+            console.log(`PLAYER: Reload Complete. Added ${available}. Mag: ${state.ammo}, Reserve: ${state.reserve}`);
 
             this.updateAmmoDisplay();
             this.isReloading = false;
@@ -308,11 +308,22 @@ export class Player {
             
             this.createFloatingText(this.position, "READY", "#00ff00");
 
-        }, reloadTime);
+        }, totalTime * 1000);
     }
+
+
+
+
+
+
+        
+
+
 
     attack() {
         if (this.isDead || this.attackCooldown > 0) return;
+        if (this.isReloading) return; // Block shooting while reloading
+
 
         const type = this.getCurrentWeaponType();
         if (!type) return; // No weapon
@@ -479,6 +490,42 @@ export class Player {
     update(dt) {
         if (this.isDead) return;
         
+        // Cap dt to prevent massive jumps (lag spikes) from eating timers instantly
+        if (dt > 0.1) dt = 0.1;
+
+        // --- MERGED LOGIC start ---
+        // Update Immunity
+        if (this.invulnerabilityTimer > 0) {
+            this.invulnerabilityTimer -= dt;
+            if (this.frameCount % 60 === 0) console.log(`PLAYER: God Timer: ${this.invulnerabilityTimer.toFixed(2)}`);
+            if (this.invulnerabilityTimer <= 0) {
+                this.isInvulnerable = false;
+                console.log("PLAYER: Spawn Protection EXPIRED. God Mode: OFF");
+                this.createFloatingText(this.position, "SYSTEM READY", "#00ff00");
+            }
+        }
+
+        // Update Weapon Position (Bobbing)
+        // Check if moving (Velocity > 0.1)
+        const isMoving = this.velocity.lengthSq() > 0.1; // Simple check
+        this._updateWeaponModel(dt, isMoving);
+        
+        // Recoil Recovery
+        if (this.recoilRecovery > 0) {
+            const recovery = 2.0 * dt; 
+            this.camera.rotation.x -= Math.min(recovery, this.recoilRecovery);
+            this.recoilRecovery = Math.max(0, this.recoilRecovery - recovery);
+        }
+        
+        // Screen Shake
+        if (this.shakeTime > 0) {
+            this.shakeTime -= dt;
+            const rx = (Math.random() - 0.5) * this.shakeIntensity;
+            const ry = (Math.random() - 0.5) * this.shakeIntensity;
+            this.camera.position.add(new THREE.Vector3(rx, ry, 0)); 
+        }
+        // --- MERGED LOGIC end ---
+        
         // Debug Heartbeat
         if (!this.frameCount) this.frameCount = 0;
         this.frameCount++;
@@ -547,48 +594,12 @@ export class Player {
         }
     }
 
-    reload() {
-        if (this.isReloading) return;
-        
-        const type = this.inventory[this.currentSlot];
-        const state = this.weaponState[type];
-        const config = WeaponConfig[type];
-        
-        if (!state || state.reserve <= 0 || state.ammo >= config.magSize) return;
 
-        this.isReloading = true;
-        
-        // UI Feedback
-        this.createFloatingText(this.position, "RELOADING...", "#ffff00");
-        
-        // Play Sound? (Later)
-
-        const time = (config.reloadTime || 2.0) * 1000;
-
-        setTimeout(() => {
-            if (this.isDead) return;
-            
-            // Calculate Refill
-            const needed = config.magSize - state.ammo;
-            const available = Math.min(needed, state.reserve);
-            
-            state.ammo += available; // Refill Mag
-            if (config.maxReserve !== Infinity) {
-                state.reserve -= available; // Deduct from Reserve
-            }
-
-            this.isReloading = false;
-            
-            // Update UI
-            if (this.game && this.game.renderHotbar) this.game.renderHotbar(); 
-            
-        }, time);
-    }
 
     takeDamage(amount) {
         if (this.isDead) return;
-        // FORCE DISABLE GOD MODE FOR USER
-        // if (this.isInvulnerable) return; 
+        // Spawn Protection
+        if (this.isInvulnerable) return; 
         
         // Cooldown check for rapid hits (unless amount is massive, e.g. explosion?)
         // Let's enforce cooldown for ALL damage to stop instakills

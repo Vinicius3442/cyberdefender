@@ -36,7 +36,6 @@ export class WeaponPickup {
         }
 
         this.mesh = this._createMesh();
-        this.mesh = this._createMesh();
         this.mesh.position.copy(this.position);
         
         // Snap to ground initially
@@ -47,8 +46,10 @@ export class WeaponPickup {
         
         this.scene.add(this.mesh);
 
-        this.yOffset = 0; // New property for bobbing
-        this.radius = 2.0; // Fix: Define pickup radius
+        this.yOffset = 0; 
+        this.radius = 2.0; 
+        this.lifeTime = 0;
+        this.maxLifeTime = 30.0; // 30 Seconds before despawn
     }
 
     _createMesh() {
@@ -79,6 +80,19 @@ export class WeaponPickup {
     }
 
     update(dt, playerPos) {
+        this.lifeTime += dt;
+        
+        // Blink near end
+        if (this.lifeTime > this.maxLifeTime - 5) {
+             // Blink effect
+             this.mesh.visible = Math.floor(this.lifeTime * 10) % 2 === 0;
+        }
+
+        if (this.lifeTime >= this.maxLifeTime) {
+            this.shouldRemove = true;
+            return false;
+        }
+
         this.mesh.rotation.y += dt * 2;
         
         let groundH = 0;

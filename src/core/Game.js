@@ -57,7 +57,7 @@ export class Game {
         this.init();
     }
 
-    }
+
 
     dispose() {
         // Stop Loop
@@ -158,18 +158,28 @@ export class Game {
         // Input
         this.input = new Input();
         this.input.onPause = () => this.togglePause();
-        this.input.onInventory = () => this.toggleInventory();
+        this.input.onPause = () => this.togglePause();
+        // this.input.onInventory = () => this.toggleInventory(); // DISABLED per user request
+        this.input.onInteract = () => this.checkInteraction(); 
         this.input.onInteract = () => this.checkInteraction(); 
         
         // Player Action Bindings
         this.input.onAttack = () => { /* Attack handled in update loop */ };
         this.input.onReload = () => { 
-            console.log("GAME: RELOAD KEY PRESSED"); 
-            if (this.isPaused && this.mode !== 'BOSSRUSH') return; // Allow some input if strictly UI, but generally paused blocks.
-            // Actually, if Paused for Arsenal, we don't want reload.
-            if (this.isPaused) return;
+            console.log(`GAME: RELOAD KEY PRESSED. Paused: ${this.isPaused}, Mode: ${this.mode}`); 
+            
+            // strictly block if paused?
+            if (this.isPaused) {
+                console.log("GAME: Reload ignored because Game is PAUSED.");
+                return;
+            }
 
-            if (this.player) this.player.reload(); 
+            if (this.player) {
+                console.log("GAME: calling player.reload()");
+                this.player.reload(); 
+            } else {
+                console.error("GAME: Player is NULL");
+            }
         };
         this.input.onDrop = () => { 
             if (this.isPaused) return;
@@ -326,12 +336,7 @@ export class Game {
         }
     }
 
-    getTerrainHeight(x, z) {
-        if (this.worldGen) {
-            return this.worldGen.getHeight(x, z);
-        }
-        return 0;
-    }
+
 
     initMultiplayer() {
         // Unlock all weapons
@@ -471,7 +476,9 @@ export class Game {
             // Resume Game
             this.isPaused = false;
             document.body.requestPointerLock();
-            this.clock.getDelta();
+            
+            // Reset clock safely
+            this.clock.getDelta(); 
         }
     }
 
@@ -1261,7 +1268,7 @@ export class Game {
     spawnBossQueue() {
         // Start with ED209
         console.log("GAME: Spawning Boss ED209");
-        this.spawnEnemy('ED209');
+        this.spawnBoss('ED209');
     }
 
     onWindowResize() {
