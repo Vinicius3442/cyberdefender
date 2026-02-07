@@ -4,6 +4,11 @@ import { Input } from './Input.js';
 import { Player } from '../entities/Player.js';
 import { WaveManager } from '../systems/WaveManager.js';
 import { Collision } from '../systems/Collision.js';
+import { KnightEnemy } from '../entities/KnightEnemy.js';
+import { ArcherEnemy } from '../entities/ArcherEnemy.js';
+import { ShieldEnemy } from '../entities/ShieldEnemy.js';
+import { AssassinEnemy } from '../entities/AssassinEnemy.js';
+import { MountedKnightEnemy } from '../entities/MountedKnightEnemy.js';
 import { UpgradeManager } from '../systems/UpgradeManager.js';
 import { ParticleSystem } from '../systems/ParticleSystem.js';
 import { NetworkManager } from './NetworkManager.js';
@@ -120,12 +125,11 @@ export class Game {
         // Procedural Sky
         this.createSky();
 
-        // Fog for Infinite Horizon (Matches ground color 0x8b5a2b)
-        // Linear Fog allows visibility of Castle (-2000) while hiding edge
-        // Start fading at 500, fully opaque at 4000 (Extended for Citadel)
-        this.scene.fog = new THREE.Fog(0x8b5a2b, 500, 4000); 
+        // Fog removed by user request (Performance/Visibility)
+        this.scene.fog = null;
 
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+        // Increased Far Plane to 4500 to see Sky Sphere (Radius 4000)
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4500);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setClearColor(0x8b5a2b); // Maintain background color match
@@ -714,8 +718,15 @@ export class Game {
         // Actually, I need to read the file first to know where to put it properly.
     }
 
-    // spawnBoss moved to lower section to avoid duplication
-    // (Merged with spawnBoss(type))
+    // spawnBoss wrapper
+    spawnBoss(identifier) {
+        console.log("GAME: spawnBoss called with", identifier);
+        if (this.entityManager) {
+            this.entityManager.spawnBoss(identifier);
+        } else {
+            console.error("Game.js: Cannot spawn boss, EntityManager missing.");
+        }
+    }
 
     activateKonamiCheat() {
         console.log("KONAMI CODE ACTIVATED!");
@@ -1307,8 +1318,8 @@ export class Game {
         const sky = new THREE.Mesh(skyGeo, skyMat);
         this.scene.add(sky);
 
-        // Fog (Dusty Haze)
-        this.scene.fog = new THREE.FogExp2(0xddccaa, 0.015);
+        // Fog (Dusty Haze) - REMOVED (User Request)
+        // this.scene.fog = new THREE.FogExp2(0xddccaa, 0.015);
 
         // Sun Light
         const sun = new THREE.DirectionalLight(0xffffff, 1.2);

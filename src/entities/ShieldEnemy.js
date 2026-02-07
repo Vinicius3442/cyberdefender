@@ -16,34 +16,63 @@ export class ShieldEnemy extends Enemy {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Body (Dark Grey Armor)
-        const geometry = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
-        const material = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const body = new THREE.Mesh(geometry, material);
-        // Position relative to group (origin at feet)
-        body.position.y = 0.9;
-        group.add(body);
+        // Heavy Armor Body
+        const matArmor = new THREE.MeshStandardMaterial({ 
+            color: 0x222222, 
+            roughness: 0.4,
+            metalness: 0.8
+        });
         
-        // Head (Helmet)
-        const head = new THREE.Mesh(
-            new THREE.BoxGeometry(0.5, 0.5, 0.5),
-            new THREE.MeshStandardMaterial({ color: 0x222222 })
-        );
-        head.position.y = 1.9;
+        // Torso
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), matArmor);
+        torso.position.y = 1.0;
+        group.add(torso);
+        
+        // Legs
+        const legGeo = new THREE.BoxGeometry(0.3, 1.0, 0.4);
+        const leftLeg = new THREE.Mesh(legGeo, matArmor);
+        leftLeg.position.set(-0.3, 0.5, 0);
+        group.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(legGeo, matArmor);
+        rightLeg.position.set(0.3, 0.5, 0);
+        group.add(rightLeg);
+
+        // Head (Rectangular Helmet)
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), matArmor);
+        head.position.y = 1.7;
         group.add(head);
         
-        // Energy Shield (Front)
-        const shieldGeo = new THREE.BoxGeometry(1.2, 1.5, 0.1);
+        // Visor (Glowing slit)
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.26), new THREE.MeshStandardMaterial({ color: 0x0088ff, emissive: 0x0088ff }));
+        visor.position.y = 1.7;
+        visor.position.z = 0.13;
+        group.add(visor);
+
+        // Huge Energy Shield
+        const shieldGeo = new THREE.BoxGeometry(1.4, 1.8, 0.1);
         const shieldMat = new THREE.MeshStandardMaterial({ 
-            color: 0x0088ff, 
+            color: 0x00aaff, 
             transparent: true, 
-            opacity: 0.6,
+            opacity: 0.4,
             emissive: 0x0044aa,
-            emissiveIntensity: 0.5
+            emissiveIntensity: 0.8,
+            roughness: 0.0,
+            metalness: 0.9
         });
+        
+        // Shield frame
+        const frameGeo = new THREE.BoxGeometry(1.5, 1.9, 0.05);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.set(0, 1.0, 0.6);
+        group.add(frame);
+        
         this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
-        this.shieldMesh.position.set(0, 0.9, 0.6); // Front
+        this.shieldMesh.position.set(0, 1.0, 0.6); // Front
         group.add(this.shieldMesh);
+        
+        // Shield Generator effects?
         
         return group;
     }

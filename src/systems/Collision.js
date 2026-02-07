@@ -8,6 +8,13 @@ export class Collision {
         this.enemies = enemies;
         this.projectiles = projectiles;
         this.particleSystem = particleSystem;
+
+        // Pre-allocate Cache for GC Free Loop
+        this._tempBox1 = new THREE.Box3();
+        this._tempBox2 = new THREE.Box3();
+        this._tempVec = new THREE.Vector3();
+        this._tempVec2 = new THREE.Vector3(); // FIX: Added second temp vector
+        this._tempSize = new THREE.Vector3();
     }
 
     update(dt) {
@@ -52,25 +59,30 @@ export class Collision {
 
                 // Simple check at interpolated position
                 const factor = (s + 1) / steps;
-                // We check backwards from current position to previous
-                // Actually, assuming projective moved logic is external, we check the path it JUST covered.
-                // If Projectile moved V * dt, we check along that ray.
-                const checkPos = proj.mesh.position.clone().sub(proj.velocity.clone().multiplyScalar(this.dt || 0.016).multiplyScalar(1 - factor));
+                
+                // Optimized Vector Math (Use separate vectors to avoid reference clash)
+                // 1. Calculate Offset into _tempVec2
+                this._tempVec2.copy(proj.velocity).multiplyScalar((this.dt || 0.016) * (1 - factor));
+                
+                // 2. Calculate Check Position: Pos - Offset
+                this._tempVec.copy(proj.mesh.position).sub(this._tempVec2);
                 
                 // Temp check box at this interpolated position
-                const projBox = new THREE.Box3().setFromCenterAndSize(
-                    checkPos,
-                    new THREE.Vector3(0.5, 0.5, 0.5) // Slightly larger bullet box
+                this._tempBox1.setFromCenterAndSize(
+                    this._tempVec, // Center
+                    this._tempSize.set(0.5, 0.5, 0.5) // Size
                 );
 
                 if (proj.isPlayerProjectile) {
                     for (const enemy of this.enemies) {
                         if (enemy.isDead) continue;
-                        const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
+                        
+                        // Optimized Enemy Box (No alloc)
+                        this._tempBox2.setFromObject(enemy.mesh);
 
-                        if (Utils.checkCollision(projBox, enemyBox)) {
+                        if (this._tempBox1.intersectsBox(this._tempBox2)) {
                             if (proj.isExplosive) {
-                                this.createExplosion(checkPos, proj.explosionRadius, proj.damage, false);
+                                this.createExplosion(this._tempVec, proj.explosionRadius, proj.damage, false);
                             } else {
                                 enemy.takeDamage(proj.damage);
                             }
@@ -80,25 +92,19 @@ export class Collision {
                     }
                 } else {
                     // Player Hitbox Fix
-                    // Player pos is at feet (0, 1.6, 0) usually? No, Player.js: "this.position = new THREE.Vector3(0, 1.6, 0);" 
-                    // AND update() keeps it at groundHeight + 1.6. So position is EYE LEVEL?
-                    // "groundHeight + 1.6" suggests position is 1.6m ABOVE ground.
-                    // So feet are at pos.y - 1.6.
-                    // Box center should be pos.y - 0.8 (mid body).
-                    // Size 1.8 height.
-                    const centerPos = this.player.position.clone();
+                    const centerPos = this.player.position.clone(); // Can optimize this too but it's once per step
                     centerPos.y -= 0.8; 
                     
-                    const playerBox = new THREE.Box3().setFromCenterAndSize(
+                    this._tempBox2.setFromCenterAndSize(
                         centerPos,
-                        new THREE.Vector3(0.6, 1.8, 0.6)
+                        this._tempSize.set(0.6, 1.8, 0.6)
                     );
 
-                    if (Utils.checkCollision(projBox, playerBox)) {
+                    if (this._tempBox1.intersectsBox(this._tempBox2)) {
                         /* console.log("HIT PLAYER! Damage:", proj.damage); */
                         // Hit Player
                         if (proj.isExplosive) {
-                            this.createExplosion(checkPos, proj.explosionRadius, proj.damage, true);
+                            this.createExplosion(this._tempVec, proj.explosionRadius, proj.damage, true);
                         } else {
                             this.player.takeDamage(proj.damage);
                         }
@@ -116,28 +122,32 @@ export class Collision {
             const playerDir = new THREE.Vector3();
             this.player.camera.getWorldDirection(playerDir);
 
-            const attackPos = this.player.position.clone().add(playerDir.multiplyScalar(1.0));
-            const attackBox = new THREE.Box3().setFromCenterAndSize(
-                attackPos,
-                new THREE.Vector3(1.5, 2.0, 1.5)
+            // Calculate attackPos without clone
+            // attackPos = pos + dir * 1.5
+            this._tempVec.copy(this.player.position).addScaledVector(playerDir, 1.5);
+            
+            this._tempBox1.setFromCenterAndSize(
+                this._tempVec,
+                this._tempSize.set(1.5, 2.0, 1.5)
             );
 
             for (const enemy of this.enemies) {
                 if (enemy.isDead) continue;
-                const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
+                this._tempBox2.setFromObject(enemy.mesh);
 
-                if (Utils.checkCollision(attackBox, enemyBox)) {
+                if (this._tempBox1.intersectsBox(this._tempBox2)) {
                     enemy.takeDamage(this.player.getCurrentWeaponConfig().damage);
                 }
             }
         }
 
         // 3. Enemies vs Player (Melee contact)
+        // Optimization: Calculate player box once
         const centerPos = this.player.position.clone();
-        centerPos.y -= 0.8; // Fix: Lower box to covers body, not just head
-        const playerBox = new THREE.Box3().setFromCenterAndSize(
+        centerPos.y -= 0.8; 
+        const playerBox = this._tempBox1.setFromCenterAndSize(
             centerPos,
-            new THREE.Vector3(0.5, 1.8, 0.5)
+            this._tempSize.set(0.5, 1.8, 0.5)
         );
 
         for (const enemy of this.enemies) {

@@ -66,7 +66,8 @@ export class CastleLevel {
         if (this.game.waveManager) {
             this.game.waveManager.currentWave = 10; // Sets it to 10 so startNextWave makes it 11
             this.game.waveManager.waveInProgress = false; // Reset state
-            this.game.waveManager.enemies = []; // Clear old enemies ref
+            // Enemies reference is shared with EntityManager, so relying on clearScene() is correct.
+            // Do NOT reassign enemies to [] here.
             this.game.waveManager.enemiesToSpawn = 0;
             
             this.game.waveManager.startNextWave();

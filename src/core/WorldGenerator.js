@@ -4,7 +4,7 @@ import { Utils } from './Utils.js';
 export class WorldGenerator {
     constructor(scene) {
         this.scene = scene;
-        this.worldSize = 2500; // Expanded for Horizon
+        this.worldSize = 1500; // Reduced from 2500 for Performance
         this.spawnRadius = 250; // Keep gameplay area focused
         this.chunkSize = 10;
         this.props = [];

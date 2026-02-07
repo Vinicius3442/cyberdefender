@@ -160,6 +160,7 @@ export class WaveManager {
 
         // BOSS WAVE LOGIC
         if (this.currentWave % 10 === 0 && !this.bossSpawned) {
+             console.log("WAVEMANAGER: Attempting to spawn Boss for Wave " + this.currentWave);
              this.game.spawnBoss(this.currentWave); 
              this.bossSpawned = true;
              this.enemiesToSpawn--; 
@@ -169,7 +170,39 @@ export class WaveManager {
         if (this.bossSpawned) return;
 
         const enemyType = this.getEnemyType();
-        this.game.spawnEnemy(enemyType); 
+        
+        // FOV SPAWNING (Directional)
+        // Spawn within +/- 60 degrees of player forward vector
+        // Distance: 40 to 80 units
+        
+        let spawnPos;
+        if (this.player && this.player.camera) {
+            const playerDir = new THREE.Vector3();
+            this.player.camera.getWorldDirection(playerDir);
+            playerDir.y = 0;
+            playerDir.normalize();
+
+            const angleOffset = (Math.random() - 0.5) * (Math.PI / 1.5); // +/- 60 deg
+            const dist = 40 + Math.random() * 40;
+            
+            // Rotate vector
+            const s = Math.sin(angleOffset);
+            const c = Math.cos(angleOffset);
+            
+            const dirX = playerDir.x * c - playerDir.z * s;
+            const dirZ = playerDir.x * s + playerDir.z * c;
+
+            spawnPos = new THREE.Vector3(
+                this.player.position.x + dirX * dist,
+                10, // Drop from sky
+                this.player.position.z + dirZ * dist
+            );
+        } else {
+             // Fallback
+             spawnPos = Utils.getRandomPosition(50, 100); 
+        }
+
+        this.game.spawnEnemy(enemyType, spawnPos); 
         this.enemiesToSpawn--;
     }
 
@@ -183,15 +216,15 @@ export class WaveManager {
              // Check limit for "Heavy" units (Tanks) to prevent lag/bugs
              const tankCount = this.enemies.filter(e => e.constructor.name === 'TankEnemy').length;
              
-             if (rand < 0.3) return 'KNIGHT';
-             if (rand < 0.5) return 'ARCHER';
-             if (rand < 0.7) return 'SHIELD';
-             if (rand < 0.85) return 'NINJA'; 
+             if (rand < 0.2) return 'KNIGHT';
+             if (rand < 0.4) return 'ARCHER';
+             if (rand < 0.6) return 'SHIELD';
+             if (rand < 0.75) return 'ASSASSIN'; // New
              
-             // Cap Tanks to 3 active at once
-             if (tankCount < 3) return 'TANK'; 
+             // Cap Cavalry/Tanks
+             if (tankCount < 3) return 'CAVALRY'; // Was TANK, now Mounted Knight
              
-             return 'KNIGHT'; // Fallback if tank cap reached
+             return 'KNIGHT'; // Fallback
         }
 
         // WASTELAND (Default)

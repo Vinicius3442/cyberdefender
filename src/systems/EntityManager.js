@@ -13,7 +13,8 @@ import { ShieldEnemy } from '../entities/ShieldEnemy.js';
 import { KnightEnemy } from '../entities/KnightEnemy.js';
 import { ArcherEnemy } from '../entities/ArcherEnemy.js';
 import { NinjaEnemy } from '../entities/NinjaEnemy.js';
-
+import { AssassinEnemy } from '../entities/AssassinEnemy.js';
+import { MountedKnightEnemy } from '../entities/MountedKnightEnemy.js';
 
 export class EntityManager {
     constructor(game) {
@@ -60,15 +61,6 @@ export class EntityManager {
         // Score & Drop Logic
         if (this.game.player) this.game.player.score += 100;
 
-        // Propagate death event for Game to handle effects? 
-        // Or handle simple effects here?
-        // Game.js had drop logic. Let's replicate or delegate.
-        // For now, let's trigger the drop logic if Game exposes it, or move it here.
-        // Game.js has specific weighted random drop logic. 
-        // Let's call back to Game for drops to keep EntityManager clean of "Item" logic? 
-        // OR move Item logic later. 
-        // For refactoring speed: Call game.spawnDrop(e.mesh.position)
-        
         if (Math.random() < 0.5) { 
             if (this.game.spawnRandomDrop) {
                 this.game.spawnRandomDrop(e.mesh.position.clone());
@@ -81,7 +73,7 @@ export class EntityManager {
         for (const e of this.enemies) {
             if (e.mesh) this.scene.remove(e.mesh);
         }
-        this.enemies = [];
+        this.enemies.length = 0; // Maintain reference for other systems
     }
 
     spawnEnemy(type) {
@@ -119,6 +111,8 @@ export class EntityManager {
             case 'KNIGHT': enemy = new KnightEnemy(scene, position); break;
             case 'ARCHER': enemy = new ArcherEnemy(scene, position, projectiles); break;
             case 'NINJA': enemy = new NinjaEnemy(scene, position); break;
+            case 'ASSASSIN': enemy = new AssassinEnemy(scene, position); break;
+            case 'CAVALRY': enemy = new MountedKnightEnemy(scene, position); break;
             
             default: 
                 console.warn("EntityManager: Unknown enemy type:", type);
@@ -136,7 +130,9 @@ export class EntityManager {
         // CASE A: WAVE NUMBER
         if (typeof identifier === 'number') {
             const waveNum = identifier;
+            console.log("ENTITY_MANAGER: Resolving Boss for Wave", waveNum);
             if (waveNum % 10 === 0) {
+                console.log("ENTITY_MANAGER: Spawning ATOM");
                 this.spawnBoss('ATOM');
             } else if (waveNum % 5 === 0) {
                 this.spawnBoss('ED209');
@@ -162,7 +158,7 @@ export class EntityManager {
             case 'ED209': enemy = new ED209(scene, pos, projectiles); break;
             case 'ATOM': 
                 enemy = new AtomBoss(scene, this.game.player, pos); 
-                // Boss Arena setup? Delegated to LevelManager typically, but fine here for now.
+                // Boss Arena setup?
                 if (this.game.worldGen && this.game.worldGen.spawnBossArena) {
                     this.game.worldGen.spawnBossArena(new THREE.Vector3(0,0,0));
                 }
@@ -176,9 +172,11 @@ export class EntityManager {
         }
             
         if (enemy) {
+            console.log("ENTITY_MANAGER: Enemy created successfully", type);
             enemy.isBoss = true;
             if (!enemy.projectiles) enemy.projectiles = projectiles;
             this.enemies.push(enemy);
+            console.log("ENTITY_MANAGER: Enemy pushed. Count:", this.enemies.length);
             
             // Ensure mesh added if not already
             if (!scene.getObjectByProperty('uuid', enemy.mesh.uuid)) {

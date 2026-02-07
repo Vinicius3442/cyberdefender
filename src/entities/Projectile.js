@@ -9,8 +9,9 @@ export class Projectile {
     static matExplosive = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Same as enemy for now
 
     constructor(position, direction, isPlayerProjectile = true) {
-        this.velocity = direction.clone().normalize().multiplyScalar(20);
+        this.velocity = direction.clone().multiplyScalar(isPlayerProjectile ? 50 : 20);
         this.isPlayerProjectile = isPlayerProjectile;
+        this.hasGravity = false; // Default false
         this.shouldRemove = false;
         this.damage = 10;
         this.radius = 0.1;
@@ -90,8 +91,12 @@ export class Projectile {
         }
 
         this.lifeTime -= dt;
-        if (this.lifeTime <= 0) {
-            this.shouldRemove = true;
+        if (this.lifeTime <= 0) this.shouldRemove = true;
+
+        if (this.hasGravity) {
+            this.velocity.y -= 15.0 * dt; // Gravity
+            // Rotate to follow trajectory
+            this.mesh.lookAt(this.mesh.position.clone().add(this.velocity));
         }
 
         const moveStep = this.velocity.clone().multiplyScalar(dt);
