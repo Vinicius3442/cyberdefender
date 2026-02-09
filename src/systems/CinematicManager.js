@@ -18,7 +18,7 @@ export class CinematicManager {
             backgroundColor: 'white', zIndex: '9999', transition: 'opacity 2s'
         });
         document.body.appendChild(flash);
-        
+
         // Massive Screen Shake via Player
         if (this.game.player) {
             this.game.player.shakeTime = 4.0;

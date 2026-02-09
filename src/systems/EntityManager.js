@@ -29,22 +29,22 @@ export class EntityManager {
     update(dt) {
         // Update Enemies
         const playerPos = this.game.player.position;
-        
+
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
-            
+
             // Logic Culling (Performance)
             // Skip updates if too far, UNLESS it's a Boss or specialized type
             const dist = e.mesh.position.distanceTo(playerPos);
             if (dist > 1000 && !e.isBoss) {
                 e.mesh.visible = false; // Cull visual logic too if needed (frustum does this, but this ensures)
-                continue; 
+                continue;
             } else {
-                 e.mesh.visible = true;
+                e.mesh.visible = true;
             }
 
             e.update(dt, playerPos);
-            
+
             // Death cleanup
             if (e.isDead && e.shouldRemove) {
                 this.removeEnemy(i);
@@ -55,13 +55,13 @@ export class EntityManager {
     removeEnemy(index) {
         const e = this.enemies[index];
         if (e.mesh) this.scene.remove(e.mesh);
-        
+
         this.enemies.splice(index, 1);
-        
+
         // Score & Drop Logic
         if (this.game.player) this.game.player.score += 100;
 
-        if (Math.random() < 0.5) { 
+        if (Math.random() < 0.5) {
             if (this.game.spawnRandomDrop) {
                 this.game.spawnRandomDrop(e.mesh.position.clone());
             }
@@ -76,25 +76,47 @@ export class EntityManager {
         this.enemies.length = 0; // Maintain reference for other systems
     }
 
-    spawnEnemy(type) {
+    spawnEnemy(type, spawnPos = null) {
         if (!type) return;
 
-        // Position Logic (Randomized around player)
-        const spawnPos2D = Utils.getRandomSpawnPosition(40, 15);
-        const position = { 
-            x: this.game.player.position.x + spawnPos2D.x, 
-            y: 0, 
-            z: this.game.player.position.z + spawnPos2D.z 
-        };
+        let position;
 
-        // Align with terrain
-        if (this.game.getTerrainHeight) {
+        if (spawnPos) {
+            position = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
+        } else {
+            // Position Logic (Randomized around player)
+            const spawnPos2D = Utils.getRandomSpawnPosition(40, 15);
+            position = {
+                x: this.game.player.position.x + spawnPos2D.x,
+                y: 0,
+                z: this.game.player.position.z + spawnPos2D.z
+            };
+        }
+
+        // Align with terrain IF NOT provided or if we want to snap
+        // If spawnPos is provided (e.g. from WaveManager with logic), we might trust it?
+        // But WaveManager often sets Y=10.
+        // Let's snap to terrain only if height is missing or 0? 
+        // Actually, for Castle, we want to snap to 0 (flat).
+        // If we trust scene.userData.getTerrainHeight, we should always snap?
+        // UNLESS it's a flying enemy?
+        // Let's always snap for safety unless we really want sky drops.
+        // WaveManager uses Y=10 for sky drops.
+
+        // Revised Logic:
+        // If spawnPos is provided, use it. 
+        // If not, random + snap.
+
+        if (!spawnPos && this.game.getTerrainHeight) {
             position.y = this.game.getTerrainHeight(position.x, position.z);
+        } else if (spawnPos) {
+            // If passed from WaveManager (Y=10), keep it? 
+            // Yes, WaveManager handles "Sky Drop".
         }
 
         let enemy;
         // Projectiles passed from Game
-        const projectiles = this.game.projectiles; 
+        const projectiles = this.game.projectiles;
         const scene = this.scene; // Getter
 
         switch (type) {
@@ -113,8 +135,8 @@ export class EntityManager {
             case 'NINJA': enemy = new NinjaEnemy(scene, position); break;
             case 'ASSASSIN': enemy = new AssassinEnemy(scene, position); break;
             case 'CAVALRY': enemy = new MountedKnightEnemy(scene, position); break;
-            
-            default: 
+
+            default:
                 console.warn("EntityManager: Unknown enemy type:", type);
                 return;
         }
@@ -141,12 +163,12 @@ export class EntityManager {
         }
 
         const type = identifier;
-        
+
         let spawnZ = -50;
         if (type === 'ATOM') spawnZ = -40;
 
         const h = this.game.getTerrainHeight ? this.game.getTerrainHeight(0, spawnZ) : 0;
-        const pos = new THREE.Vector3(0, h + (type === 'ATOM' ? 15 : 2), spawnZ); 
+        const pos = new THREE.Vector3(0, h + (type === 'ATOM' ? 15 : 2), spawnZ);
 
         let enemy;
         const projectiles = this.game.projectiles;
@@ -156,28 +178,28 @@ export class EntityManager {
 
         switch (type) {
             case 'ED209': enemy = new ED209(scene, pos, projectiles); break;
-            case 'ATOM': 
-                enemy = new AtomBoss(scene, this.game.player, pos); 
+            case 'ATOM':
+                enemy = new AtomBoss(scene, this.game.player, pos);
                 // Boss Arena setup?
                 if (this.game.worldGen && this.game.worldGen.spawnBossArena) {
-                    this.game.worldGen.spawnBossArena(new THREE.Vector3(0,0,0));
+                    this.game.worldGen.spawnBossArena(new THREE.Vector3(0, 0, 0));
                 }
                 if (this.game.player.applyScreenShake) {
                     this.game.player.applyScreenShake(0.5);
                 }
                 break;
-            default: 
-                this.spawnEnemy(type); 
+            default:
+                this.spawnEnemy(type);
                 return;
         }
-            
+
         if (enemy) {
             console.log("ENTITY_MANAGER: Enemy created successfully", type);
             enemy.isBoss = true;
             if (!enemy.projectiles) enemy.projectiles = projectiles;
             this.enemies.push(enemy);
             console.log("ENTITY_MANAGER: Enemy pushed. Count:", this.enemies.length);
-            
+
             // Ensure mesh added if not already
             if (!scene.getObjectByProperty('uuid', enemy.mesh.uuid)) {
                 scene.add(enemy.mesh);

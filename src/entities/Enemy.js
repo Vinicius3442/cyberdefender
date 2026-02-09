@@ -14,7 +14,7 @@ export class Enemy {
         // Create Mesh (Subclasses can override _createMesh to provide custom models)
         this.mesh = this._createMesh();
         this.mesh.position.copy(position);
-        this.mesh.position.y = 0; // Origin is at feet now
+        // this.mesh.position.y = 0; // REMOVE: Respect passed Y (e.g. from WaveManager)
         this.mesh.castShadow = true;
 
         this.scene.add(this.mesh);
@@ -65,13 +65,13 @@ export class Enemy {
         // Eyes (Relative to head center 1.175)
         // Z = 0 + 0.125 (half head) + 0.005. Y = 1.175 + 0.03
         const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.01), eyeMat);
-        leftEye.position.set(-0.06, 1.205, 0.13); 
+        leftEye.position.set(-0.06, 1.205, 0.13);
         group.add(leftEye);
 
         const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.01), eyeMat);
         rightEye.position.set(0.06, 1.205, 0.13);
         group.add(rightEye);
-        
+
         return group;
     }
 
@@ -86,30 +86,44 @@ export class Enemy {
         // Skip flashing if already flashing to avoid color glitching
         if (!this.isFlashing) {
             this.playAnimation('hit'); // New: Trigger hit anim
-            
+
             this.isFlashing = true;
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    // Check if material supports emissive
-                    if (child.material.emissive) {
-                        if (!child.userData.hasClonedMaterial) {
-                            child.material = child.material.clone();
-                            child.userData.hasClonedMaterial = true;
-                        }
+                    if (!child.userData.hasClonedMaterial) {
+                        child.material = child.material.clone();
+                        child.userData.hasClonedMaterial = true;
+                    }
 
+                    // Handle Standard Material (Emissive)
+                    if (child.material.emissive) {
                         if (!child.material.userData.originalEmissive) {
                             child.material.userData.originalEmissive = child.material.emissive.getHex();
                         }
                         child.material.emissive.setHex(0xffffff);
+                        child.material.emissiveIntensity = 1.0;
+                    }
+                    // Handle Basic Material (Color Tint)
+                    else if (child.material.type === 'MeshBasicMaterial') {
+                        if (!child.material.userData.originalColor) {
+                            child.material.userData.originalColor = child.material.color.getHex();
+                        }
+                        child.material.color.setHex(0xffffff);
                     }
                 }
             });
 
             setTimeout(() => {
-                if (this.mesh) { 
+                if (this.mesh) {
                     this.mesh.traverse((child) => {
-                        if (child.isMesh && child.material && child.material.userData.originalEmissive !== undefined) {
-                            child.material.emissive.setHex(child.material.userData.originalEmissive);
+                        if (child.isMesh && child.material) {
+                            if (child.material.emissive && child.material.userData.originalEmissive !== undefined) {
+                                child.material.emissive.setHex(child.material.userData.originalEmissive);
+                                // Restore intensity if needed? Assuming default was used or we tracked it.
+                                child.material.emissiveIntensity = child.material.userData.originalIntensity || 0.5; // Default guess
+                            } else if (child.material.type === 'MeshBasicMaterial' && child.material.userData.originalColor !== undefined) {
+                                child.material.color.setHex(child.material.userData.originalColor);
+                            }
                         }
                     });
                 }
@@ -126,19 +140,19 @@ export class Enemy {
         if (this.isDead) return;
         this.isDead = true;
         this.scoreValue = this.scoreValue || 100;
-        
+
         // Loot
         this.dropLoot();
 
         // Dispatch Death Event
-        const event = new CustomEvent('enemy-death', { 
-            detail: { 
-                type: this.isExplosive ? 'EXPLOSION' : 'NORMAL', 
-                position: this.mesh.position 
-            } 
+        const event = new CustomEvent('enemy-death', {
+            detail: {
+                type: this.isExplosive ? 'EXPLOSION' : 'NORMAL',
+                position: this.mesh.position
+            }
         });
         document.dispatchEvent(event);
-        
+
         // Anim
         this.playAnimation('die');
         this.playingDeathAnim = true;
@@ -159,22 +173,22 @@ export class Enemy {
 
         if (Math.random() < chance) {
             let dropType = 'AMMO';
-            
+
             // Bosses drop Weapons or Health
             if (this.isBoss) {
-                 const rand = Math.random();
-                 if (rand < 0.4) dropType = 'HEALTH';
-                 else if (rand < 0.7) dropType = 'AMMO'; // Big ammo?
-                 else dropType = 'RANDOM_WEAPON'; 
+                const rand = Math.random();
+                if (rand < 0.4) dropType = 'HEALTH';
+                else if (rand < 0.7) dropType = 'AMMO'; // Big ammo?
+                else dropType = 'RANDOM_WEAPON';
             }
-            
+
             // Specific overrides?
             // e.g. Sniper drops Sniper Ammo? (Future)
 
             // Emit Drop Event (Game.js listens)
             // If RANDOM_WEAPON, we let WeaponPickup handle randomization, or pass specific?
             // WeaponPickup handles 'RANDOM' if type is null.
-            
+
             const dropPos = this.mesh.position.clone();
             dropPos.y += 1.0;
 
@@ -184,16 +198,16 @@ export class Enemy {
             // Game.js line 122: document.addEventListener('player-drop-item'...
             // Let's reuse that for now, or add new one. 
             // Better: 'spawn-pickup'
-            
+
             // Wait, Game.js listens to 'player-drop-item'. 
             // Let's dispatch 'spawn-pickup' and add listener in Game.js?
             // Or just use 'player-drop-item' (misnamed but functional).
             // Let's add listener to Game.js for 'spawn-pickup' for clarity.
-             const event = new CustomEvent('spawn-pickup', { 
-                detail: { 
-                    type: dropType === 'RANDOM_WEAPON' ? null : dropType, 
-                    position: dropPos 
-                } 
+            const event = new CustomEvent('spawn-pickup', {
+                detail: {
+                    type: dropType === 'RANDOM_WEAPON' ? null : dropType,
+                    position: dropPos
+                }
             });
             document.dispatchEvent(event);
         }
@@ -203,33 +217,36 @@ export class Enemy {
     update(dt, playerPosition) {
         this.updateAnimations(dt);
         if (this.isDead && !this.playingDeathAnim) { // If dead but no death anim defined/playing
-             // Stop logical updates
-             return;
+            // Stop logical updates
+            return;
         }
         if (this.playingDeathAnim && this.isDead) return; // Allow death anim to play but stop movement
         // ... (subclasses handle transform updates)
     }
-    
+
     // Animation System
     updateAnimations(dt) {
         // Simple tween-like system
         if (this.currentAnim) {
-             this.animTimer += dt;
-             // Logic per anim? Or generic keyframes?
-             // Ideally we just modify transforms here
-             if (this.currentAnim === 'attack') this.animAttack(this.animTimer);
-             if (this.currentAnim === 'die') this.animDie(this.animTimer);
+            this.animTimer += dt;
+            // Logic per anim? Or generic keyframes?
+            // Ideally we just modify transforms here
+            if (this.currentAnim === 'attack') this.animAttack(this.animTimer);
+            if (this.currentAnim === 'die') this.animDie(this.animTimer);
         }
     }
-    
+
     playAnimation(name) {
         this.currentAnim = name;
         this.animTimer = 0;
+        if (name === 'attack') {
+            this.hasDealtAttackDamage = false; // Reset damage flag for Collision.js
+        }
     }
 
     // Default implementations (can override)
-    animAttack(t) {}
-    animDie(t) {}
+    animAttack(t) { }
+    animDie(t) { }
 
     // Helper for subclasses
     updateGroundPosition() {

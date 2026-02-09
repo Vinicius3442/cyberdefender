@@ -25,12 +25,12 @@ export class Player {
         // Visuals
         this.shakeTime = 0;
         this.shakeIntensity = 0;
-        
+
         // Load Skin
         this._loadSkin(skinURL);
         this.hp = 100;
         this.maxHp = 100;
-        this.score = 0; 
+        this.score = 0;
         this.isDead = false;
 
         this.isAttacking = false;
@@ -44,18 +44,18 @@ export class Player {
 
     _init() {
         this.camera.rotation.order = 'YXZ';
-        
+
         // Spawn Protection
         this.isInvulnerable = true;
-        this.invulnerabilityTimer = 3.0; 
+        this.invulnerabilityTimer = 3.0;
 
         this.lastDamageTime = 0;
-        this.damageCooldown = 0.2; 
+        this.damageCooldown = 0.2;
 
         // Input callbacks
         this.input.onMouseMove = (dx, dy) => this._onMouseMove(dx, dy);
         this.input.onAttack = () => this.weaponSystem.attack();
-        
+
         // Scene Setup
         this.scene.add(this.camera);
         // WeaponSystem handles its own container
@@ -63,7 +63,7 @@ export class Player {
         // Shield UI Setup
         // Try to find existing armor display first
         this.shieldUI = document.getElementById('armor-display');
-        
+
         if (!this.shieldUI) {
             this.shieldUI = document.getElementById('shield-display');
         }
@@ -72,7 +72,7 @@ export class Player {
             this.shieldUI = document.createElement('div');
             this.shieldUI.id = 'shield-display';
             this.shieldUI.style.position = 'absolute';
-            this.shieldUI.style.bottom = '80px'; 
+            this.shieldUI.style.bottom = '80px';
             this.shieldUI.style.left = '20px';
             this.shieldUI.style.fontSize = '24px';
             this.shieldUI.style.fontWeight = 'bold';
@@ -118,7 +118,7 @@ export class Player {
     dropWeapon() {
         this.weaponSystem.dropWeapon();
     }
-    
+
     addAmmoToAll(percent) {
         this.weaponSystem.addAmmoToAll(percent);
     }
@@ -140,7 +140,7 @@ export class Player {
         if (this.isDead) return;
 
         let sensitivity = 0.002;
-        if (this.isScoped) sensitivity *= 0.2; 
+        if (this.isScoped) sensitivity *= 0.2;
 
         this.eulerAngles.y -= dx * sensitivity;
         this.eulerAngles.x -= dy * sensitivity;
@@ -153,13 +153,13 @@ export class Player {
 
     update(dt) {
         if (this.isDead) return;
-        
+
         // Cap dt
         if (dt > 0.1) dt = 0.1;
 
         // Weapon System Update
         if (this.weaponSystem) {
-             this.weaponSystem.update(dt, this.velocity);
+            this.weaponSystem.update(dt, this.velocity);
         }
 
         // Immunity
@@ -175,34 +175,41 @@ export class Player {
 
             // Update Shield UI
             if (this.shieldUI) {
-                    this.shieldUI.innerText = `SHIELD: ${this.invulnerabilityTimer.toFixed(1)}s`;
+                // Optimization: Only update text if second changed
+                const displayVal = this.invulnerabilityTimer.toFixed(1);
+                if (this._lastShieldDisplay !== displayVal) {
+                    this.shieldUI.innerText = `SHIELD: ${displayVal}s`;
+                    this._lastShieldDisplay = displayVal;
+                }
+
+                if (this.shieldUI.style.display !== 'block') {
                     this.shieldUI.style.display = 'block';
                     this.shieldUI.style.color = '#00ffff';
+                }
             }
         } else {
             if (this.shieldUI) {
-                 this.shieldUI.innerText = "0";
-                 this.shieldUI.style.color = '#ffffff';
-                 
-                 // If ID is armor-display, keep visible
-                 if (this.shieldUI.id === 'shield-display') {
-                     this.shieldUI.style.display = 'none';
-                 } else {
-                     this.shieldUI.style.display = 'block';
-                 }
+                // Only hide if visible
+                if (this.shieldUI.style.display !== 'none' && this.shieldUI.id === 'shield-display') {
+                    this.shieldUI.style.display = 'none';
+                }
+                // If it's the armor-display (shared ID?), we might want to keep it? 
+                // Original logic: "if ID is armor-display, keep visible"
+                // But default block sets to 'none' if it's shield-display.
+                // Let's stick to original intent but optimize style access
             }
         }
-        
 
-        
+
+
         // Screen Shake
         if (this.shakeTime > 0) {
             this.shakeTime -= dt;
             const rx = (Math.random() - 0.5) * this.shakeIntensity;
             const ry = (Math.random() - 0.5) * this.shakeIntensity;
-            this.camera.position.add(new THREE.Vector3(rx, ry, 0)); 
+            this.camera.position.add(new THREE.Vector3(rx, ry, 0));
         }
-        
+
         // Debug Heartbeat
         if (!this.frameCount) this.frameCount = 0;
         this.frameCount++;
@@ -241,25 +248,25 @@ export class Player {
         }
 
 
-        const minHeight = groundHeight + 1.6; 
+        const minHeight = groundHeight + 1.6;
 
         if (this.position.y < minHeight) {
             this.position.y = minHeight;
             this.velocity.y = 0;
             this.canJump = true;
         }
-        
+
         // Sync Camera
         this.camera.position.copy(this.position);
 
         // Auto-Fire
         if (this.input.keys.attack) {
             if (this.weaponSystem.isReloading) {
-                 // Block
+                // Block
             } else {
                 const type = this.weaponSystem.getCurrentWeaponType();
                 const state = this.weaponSystem.weaponState[type];
-                
+
                 // Auto Reload Check
                 if (state && state.mag <= 0 && state.reserve > 0) {
                     this.weaponSystem.reload();
@@ -275,8 +282,8 @@ export class Player {
     takeDamage(amount) {
         if (this.isDead) return;
         // Spawn Protection
-        if (this.isInvulnerable) return; 
-        
+        if (this.isInvulnerable) return;
+
         // Cooldown check for rapid hits (unless amount is massive, e.g. explosion?)
         // Let's enforce cooldown for ALL damage to stop instakills
         const now = Date.now() / 1000;
@@ -287,7 +294,7 @@ export class Player {
 
         this.hp -= amount;
         document.getElementById('hp-display').innerText = Math.floor(this.hp);
-        
+
         // Red Flash Effect
         // Red Flash Effect
         let flash = document.getElementById('damage-flash');
@@ -309,10 +316,10 @@ export class Player {
 
         // Trigger flash
         flash.style.opacity = '0.2'; // Reduced from 0.4
-        
+
         // Clear existing timeout if any (simple debounce)
         if (this.flashTimeout) clearTimeout(this.flashTimeout);
-        
+
         this.flashTimeout = setTimeout(() => {
             flash.style.opacity = '0';
         }, 100);
@@ -328,7 +335,7 @@ export class Player {
         // 1. Initial Glitch & Freeze
         const hud = document.getElementById('ui-layer');
         hud.style.animation = 'none'; // Stop normal flicker
-        
+
         // Create Corruption Overlay if not exists
         let corruption = document.getElementById('corruption-overlay');
         if (!corruption) {
@@ -348,11 +355,11 @@ export class Player {
             `;
             document.body.appendChild(corruption);
         }
-        
+
         corruption.style.display = 'block';
         const diagList = document.getElementById('diag-list');
         diagList.innerHTML = '';
-        
+
         const systems = [
             { name: "OPTICAL SENSORS", delay: 500 },
             { name: "MOTOR FUNCTIONS", delay: 1000 },
@@ -360,19 +367,19 @@ export class Player {
             { name: "LIFE SUPPORT", delay: 2000 },
             { name: "CORE MEMORY", delay: 2500 }
         ];
-        
+
         let currentTime = 0;
-        
+
         systems.forEach((sys, i) => {
             setTimeout(() => {
                 const line = document.createElement('div');
                 line.innerHTML = `Scanning ${sys.name}... <span style="color:#f00">CRITICAL FAILURE</span>`;
                 diagList.appendChild(line);
-                
+
                 // Audio hint check?
                 // Visual Glitch per failure
                 document.body.style.filter = `hue-rotate(${Math.random() * 360}deg) contrast(${1 + i * 0.5})`;
-                
+
                 if (i === systems.length - 1) {
                     // Final Crash
                     setTimeout(() => {
@@ -380,15 +387,15 @@ export class Player {
                         if (this.game && this.game.showGameOver) {
                             this.game.showGameOver();
                         }
-                        
-                        document.exitPointerLock(); 
+
+                        document.exitPointerLock();
                         corruption.style.display = 'none';
                         document.body.style.filter = 'none';
                     }, 500); // Wait bit after last log
                 }
             }, sys.delay);
         });
-        
+
         // Submit Score
         if (window.submitScore) {
             window.submitScore(this.score);
@@ -396,9 +403,9 @@ export class Player {
     }
 
     showGameOver() {
-         const screen = document.getElementById('game-over-screen');
-         screen.style.display = 'flex';
-         document.getElementById('final-score').innerText = "SCORE: " + this.score;
+        const screen = document.getElementById('game-over-screen');
+        screen.style.display = 'flex';
+        document.getElementById('final-score').innerText = "SCORE: " + this.score;
     }
 
 
@@ -418,7 +425,7 @@ export class Player {
         el.style.fontSize = '20px';
         el.style.textShadow = '1px 1px 0 #000';
         el.style.pointerEvents = 'none';
-        
+
         // Initial 2D Project
         // We need update loop to sync position... or just CSS animation "float up and fade"
         // Let's do simple center screen float up
@@ -426,15 +433,15 @@ export class Player {
         el.style.top = '40%';
         el.style.transform = 'translate(-50%, -50%)';
         el.style.transition = 'all 1.0s';
-        
+
         document.body.appendChild(el);
-        
+
         // Animate
         setTimeout(() => {
             el.style.top = '30%';
             el.style.opacity = '0';
         }, 50);
-        
+
         setTimeout(() => el.remove(), 1000);
     }
 

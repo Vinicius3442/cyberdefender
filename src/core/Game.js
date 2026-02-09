@@ -54,21 +54,21 @@ export class Game {
         };
         this.interactables = [];
         this.portals = [];
-        
+
         // Systems
         this.levelManager = new LevelManager(this);
         this.entityManager = new EntityManager(this);
         this.cinematicManager = new CinematicManager(this);
-        
+
         // Proxy enemies array for other systems (WaveManager, Collision) that might read it
         // A getter would be cleaner, but for compatibility let's reference the manager's array
         // NOTE: We cannot simply assign this.enemies = this.entityManager.enemies here because 
         // EntityManager constructor might have set it to [] and we want to keep the reference sync.
         // Actually, just using a getter is safer.
-        
+
         this.init();
     }
-    
+
     // Compatibility Getter
     get enemies() {
         return this.entityManager ? this.entityManager.enemies : [];
@@ -79,19 +79,19 @@ export class Game {
     dispose() {
         // Stop Loop
         this.renderer.setAnimationLoop(null);
-        
+
         // Remove Listeners
-        window.removeEventListener('resize', this._onResize); 
+        window.removeEventListener('resize', this._onResize);
         document.removeEventListener('player-drop-item', this._onDropItem);
         document.removeEventListener('spawn-pickup', this._onSpawnPickup);
         document.removeEventListener('enemy-death', this._onEnemyDeath);
-        
+
         // DOM Cleanup
         const container = document.getElementById('game-container');
         if (container && this.renderer) {
             container.removeChild(this.renderer.domElement);
         }
-        
+
         // Cleanup Scene
         if (this.scene) {
             this.scene.traverse(object => {
@@ -112,10 +112,10 @@ export class Game {
         if (window.GAME_PARAMS) {
             console.log("GAME PARAMS DETECTED:", window.GAME_PARAMS);
             if (window.GAME_PARAMS.bossQueue) {
-                this.pendingBoss = window.GAME_PARAMS.bossQueue; 
+                this.pendingBoss = window.GAME_PARAMS.bossQueue;
             }
             if (window.GAME_PARAMS.infiniteAmmo) {
-                 this.infiniteAmmoCheat = true;
+                this.infiniteAmmoCheat = true;
             }
         }
 
@@ -161,34 +161,34 @@ export class Game {
         this.fps = 60;
 
         if (this.mode === 'BOSSRUSH') {
-             console.log("INITIALIZING BOSS RUSH MODE: 2D ARSENAL");
-             
-             // 1. Use Standard World for Stability
-             this.worldGen = new WorldGenerator(this.scene);
-             this.worldGen.generateLevel();
-             // Override terrain height helper (though WorldGen sets it usually? No, Game.js sets it below for SP)
-             this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
+            console.log("INITIALIZING BOSS RUSH MODE: 2D ARSENAL");
 
-             // 2. Set Safe Spawn (High up to prevent floor clip)
-             const startH = this.worldGen.getHeight(0, 0);
-             this.spawnPoint = new THREE.Vector3(0, startH + 10, 0);
-             
-             this.arsenalMenu = new ArsenalMenu(this, (loadout) => {
-                 this.startBossMatch(loadout);
-             });
-             this.arsenalMenu.show();
-             this.isPaused = true; 
-             // Force unlock after a tiny delay to override any auto-locks
-             setTimeout(() => document.exitPointerLock(), 100);
+            // 1. Use Standard World for Stability
+            this.worldGen = new WorldGenerator(this.scene);
+            this.worldGen.generateLevel();
+            // Override terrain height helper (though WorldGen sets it usually? No, Game.js sets it below for SP)
+            this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
+
+            // 2. Set Safe Spawn (High up to prevent floor clip)
+            const startH = this.worldGen.getHeight(0, 0);
+            this.spawnPoint = new THREE.Vector3(0, startH + 10, 0);
+
+            this.arsenalMenu = new ArsenalMenu(this, (loadout) => {
+                this.startBossMatch(loadout);
+            });
+            this.arsenalMenu.show();
+            this.isPaused = true;
+            // Force unlock after a tiny delay to override any auto-locks
+            setTimeout(() => document.exitPointerLock(), 100);
 
         } else {
             // SP / MP Normal
             this.worldGen = new WorldGenerator(this.scene);
             this.worldGen.generateLevel();
             this.scene.userData.getTerrainHeight = (x, z) => this.worldGen.getHeight(x, z);
-            
+
             const startH = this.worldGen.getHeight(0, 0);
-            
+
             // QUICK START OPTION (For Testing)
             // Respect passed options
             if (this.mpParams && this.mpParams.skipIntro) {
@@ -204,10 +204,10 @@ export class Game {
                 // Let's rely on the flag.
                 // If flag is passed, use it. If not, default to true for now to annoy user less.
             }
-            
+
             // Actually, let's make it cleaner:
             this.SKIP_INTRO = this.mpParams && this.mpParams.skipIntro; // Respect CLI flag
-            
+
             if (this.SKIP_INTRO) {
                 this.spawnPoint = new THREE.Vector3(0, startH + 5, 0); // Ground Spawn
                 this.deployState = { active: false, stage: 4 }; // Skip drop seq
@@ -222,14 +222,14 @@ export class Game {
         this.input.onPause = () => this.togglePause();
         this.input.onPause = () => this.togglePause();
         // this.input.onInventory = () => this.toggleInventory(); // DISABLED per user request
-        this.input.onInteract = () => this.checkInteraction(); 
-        this.input.onInteract = () => this.checkInteraction(); 
-        
+        this.input.onInteract = () => this.checkInteraction();
+        this.input.onInteract = () => this.checkInteraction();
+
         // Player Action Bindings
         this.input.onAttack = () => { /* Attack handled in update loop */ };
-        this.input.onReload = () => { 
-            console.log(`GAME: RELOAD KEY PRESSED. Paused: ${this.isPaused}, Mode: ${this.mode}`); 
-            
+        this.input.onReload = () => {
+            console.log(`GAME: RELOAD KEY PRESSED. Paused: ${this.isPaused}, Mode: ${this.mode}`);
+
             // strictly block if paused?
             if (this.isPaused) {
                 console.log("GAME: Reload ignored because Game is PAUSED.");
@@ -238,32 +238,32 @@ export class Game {
 
             if (this.player) {
                 console.log("GAME: calling player.reload()");
-                this.player.reload(); 
+                this.player.reload();
             } else {
                 console.error("GAME: Player is NULL");
             }
         };
-        this.input.onDrop = () => { 
+        this.input.onDrop = () => {
             if (this.isPaused) return;
-            if (this.player) this.player.dropWeapon(); 
+            if (this.player) this.player.dropWeapon();
         };
-        this.input.onSwitchWeapon = (slot) => { 
+        this.input.onSwitchWeapon = (slot) => {
             if (this.isPaused) return;
-            if (this.player) this.player.switchWeapon(slot); 
+            if (this.player) this.player.switchWeapon(slot);
         };
-        this.input.onInteract = () => { 
+        this.input.onInteract = () => {
             if (this.isPaused) return;
-            this.checkInteraction(); 
+            this.checkInteraction();
         };
-        this.input.onZoom = (active) => { 
+        this.input.onZoom = (active) => {
             if (this.isPaused) return;
-            if (this.player) this.player.toggleScope(active); 
+            if (this.player) this.player.toggleScope(active);
         };
 
         // Player
         this.player = new Player(this.camera, this.input, this.scene, this.projectiles, this.playerSkinURL);
-        this.player.game = this; 
-        
+        this.player.game = this;
+
         // Apply Spawn
         this.player.position.copy(this.spawnPoint);
         this.player.velocity.y = 0;
@@ -272,16 +272,16 @@ export class Game {
         this.particleSystem = new ParticleSystem(this.scene);
         this.scene.userData.particleSystem = this.particleSystem; // Expose to entities
         this.upgradeManager = new UpgradeManager(this);
-        
+
         if (this.mode === 'SP') {
             this.waveManager = new WaveManager(this.scene, this.player, this.enemies, this.upgradeManager, this);
         } else if (this.mode === 'BOSSRUSH') {
             // No wave manager initially. 
             // We manage flow manually or via ArenaLevel logic later.
         }
-        
+
         this.collision = new Collision(this.player, this.enemies, this.projectiles, this.particleSystem);
-        
+
         // Dev Console
         this.devConsole = new DevConsole(this);
 
@@ -293,7 +293,7 @@ export class Game {
         this._onDropItem = (e) => this.spawnPickup(e.detail.position, e.detail.type, 2.0);
         this._onSpawnPickup = (e) => this.spawnPickup(e.detail.position, e.detail.type);
         this._onEnemyDeath = (e) => {
-             if (e.detail.type === 'EXPLOSION') {
+            if (e.detail.type === 'EXPLOSION') {
                 this.particleSystem.createExplosion(e.detail.position, 0xff0000, 20); // Visual only
             }
         };
@@ -302,7 +302,7 @@ export class Game {
         document.addEventListener('player-drop-item', this._onDropItem);
         document.addEventListener('spawn-pickup', this._onSpawnPickup);
         document.addEventListener('enemy-death', this._onEnemyDeath);
-        
+
         document.addEventListener('boss-defeated', (e) => this.triggerReflectiveCutscene(e));
 
         // Initial Spawn Check (Cheats)
@@ -315,7 +315,7 @@ export class Game {
                 this.pendingBoss = null;
             }, 2000); // Delay slightly for world load
         }
-        
+
         // Inventory Hover State
         this.hoveredSlot = -1;
         document.addEventListener('keydown', (e) => {
@@ -331,25 +331,25 @@ export class Game {
         // KONAMI CODE CHEAT
         this.konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
         this.konamiIndex = 0;
-        
+
         // DEV CHEATS (String Buffer)
         this.cheatBuffer = "";
         this.cheats = {
             "ed209": () => this.spawnBoss('ED209'),
-            "atom": () => this.spawnBoss(10), 
+            "atom": () => this.spawnBoss(10),
             "space": () => this.loadLevel('SPACE'),
             "castle": () => this.loadLevel('CASTLE'),
-            "minigun": () => { 
-                this.player.addWeapon('Minigun'); 
+            "minigun": () => {
+                this.player.addWeapon('Minigun');
                 const idx = this.player.weaponSystem.inventory.indexOf('Minigun');
                 if (idx !== -1) this.player.switchWeapon(idx);
             },
-            "wave": (n) => { 
+            "wave": (n) => {
                 if (this.waveManager) {
                     const wave = n ? parseInt(n) : 1;
                     if (!isNaN(wave)) {
-                        this.waveManager.currentWave = wave - 1; 
-                        this.waveManager.startNextWave(); 
+                        this.waveManager.currentWave = wave - 1;
+                        this.waveManager.startNextWave();
                         console.log(`CHEAT: JUMPING TO WAVE ${wave}`);
                     }
                 }
@@ -397,14 +397,14 @@ export class Game {
                     this.konamiIndex = 0;
                 }
             } else {
-                this.konamiIndex = 0; 
+                this.konamiIndex = 0;
             }
 
             // String Cheats (Only a-z)
             if (e.key.length === 1 && /[a-z]/i.test(e.key)) {
                 this.cheatBuffer += e.key.toLowerCase();
                 if (this.cheatBuffer.length > 20) this.cheatBuffer = this.cheatBuffer.slice(-20);
-                
+
                 Object.keys(this.cheats).forEach(code => {
                     if (this.cheatBuffer.endsWith(code)) {
                         console.log("CHEAT ACTIVATED:", code);
@@ -524,20 +524,20 @@ export class Game {
                 if (pauseMenu) pauseMenu.style.display = 'flex';
                 document.exitPointerLock();
             }
-            
+
             // Stop Moving Inputs
             this.input.keys.forward = false;
             this.input.keys.backward = false;
             this.input.keys.left = false;
             this.input.keys.right = false;
             this.input.keys.attack = false;
-            
+
         } else {
             // Unpause
             if (isGameOver) {
-                 // Cannot unpause during game over!
-                 this.isPaused = true; 
-                 return;
+                // Cannot unpause during game over!
+                this.isPaused = true;
+                return;
             }
 
             if (pauseMenu) pauseMenu.style.display = 'none';
@@ -557,27 +557,27 @@ export class Game {
             // Open Inventory
             this.isPaused = true;
             document.exitPointerLock();
-            
+
             // Hide pause menu if visible (since we might have triggered pause via unlock)
             // Hide pause menu if visible (since we might have triggered pause via unlock)
             if (pauseMenu) pauseMenu.style.display = 'none';
-            
+
             invMenu.style.display = 'flex';
             this.renderInventory();
         } else {
             // Close Inventory
             invMenu.style.display = 'none';
-            
+
             // Resume Game
             this.isPaused = false;
             document.body.requestPointerLock();
-            
+
             // Reset clock safely
-            this.clock.getDelta(); 
+            this.clock.getDelta();
         }
     }
 
-    renderInventory() { 
+    renderInventory() {
         // Deprecated: Grid Inventory Removed logic.
         // We only use Hotbar now.
         // If anything calls this, redirect to Hotbar.
@@ -605,17 +605,17 @@ export class Game {
 
             // Visuals
             let content = `<span class="hotbar-key">${i + 1}</span>`;
-            
+
             if (type) {
                 const config = WeaponConfig[type];
                 if (config) {
                     const icon = config.isMelee ? '⚔️' : '🔫';
-                    content += `<div class="icon">${icon}</div><div class="name">${type.substring(0,3)}</div>`;
+                    content += `<div class="icon">${icon}</div><div class="name">${type.substring(0, 3)}</div>`;
                 }
             } else {
-                 content += `<div class="name" style="opacity:0.5; font-size:10px;">EMPTY</div>`;
+                content += `<div class="name" style="opacity:0.5; font-size:10px;">EMPTY</div>`;
             }
-            
+
             slot.innerHTML = content;
             container.appendChild(slot);
         });
@@ -626,7 +626,7 @@ export class Game {
         for (let i = this.pickups.length - 1; i >= 0; i--) {
             const p = this.pickups[i];
             const d = p.mesh.position.distanceTo(this.player.position);
-            
+
             if (d < pickupDist && d < minDist) {
                 minDist = d;
                 nearest = { pickup: p, index: i };
@@ -635,7 +635,7 @@ export class Game {
 
         if (nearest) {
             const p = nearest.pickup;
-            
+
             if (p.type === 'AMMO') {
                 this.player.addAmmoToAll(0.3); // 30% refill
                 this.player.createFloatingText(p.mesh.position, "AMMO", "#00ff00");
@@ -661,7 +661,7 @@ export class Game {
             // Find matched casing
             const entries = Object.entries(WeaponConfig);
             const match = entries.find(([key, val]) => key.toUpperCase() === type.toUpperCase());
-            
+
             if (match) {
                 type = match[0]; // Use correct Casing (e.g. 'Pistol')
             } else {
@@ -681,14 +681,14 @@ export class Game {
     }
 
     getWeightedRandomDrop() {
-        if (Math.random() < 0.3) return 'AMMO'; 
+        if (Math.random() < 0.3) return 'AMMO';
         const weights = {
             'common': 40,
             'uncommon': 35,
             'rare': 20,
             'legendary': 5
         };
-        
+
         const tiers = {
             'common': ['PISTOL', 'SMG', 'SHOTGUN', 'BAT', 'KNIFE', 'MP5'],
             'uncommon': ['RIFLE', 'SNIPER', 'REVOLVER', 'M4A1', 'SCAR', 'P90', 'AXE'],
@@ -704,18 +704,20 @@ export class Game {
 
         const pool = tiers[tier];
         const weaponKey = pool[Math.floor(Math.random() * pool.length)]; // String key like 'PISTOL'
-        
+
         // We just need to return the KEY string (e.g. 'PISTOL') because spawnPickup handles it.
         // WeaponPickup expects a type string which matches keys in WeaponConfig.
         // Our 'tiers' arrays ALREADY contain these keys.
-        
+
         return weaponKey;
     }
 
-    spawnEnemy(type) {
-        // ... (existing code, ensure it doesn't break) ...
-        // I will just append spawnBoss below standard spawn logic or near it.
-        // Actually, I need to read the file first to know where to put it properly.
+    spawnEnemy(type, position = null) {
+        if (this.entityManager) {
+            this.entityManager.spawnEnemy(type, position);
+        } else {
+            console.error("Game.js: Cannot spawn enemy, EntityManager missing.");
+        }
     }
 
     // spawnBoss wrapper
@@ -731,13 +733,13 @@ export class Game {
     activateKonamiCheat() {
         console.log("KONAMI CODE ACTIVATED!");
         alert("CHEAT ACTIVATED: WAVE 10 + ARSENAL");
-        
+
         // 1. Skip to Wave 10
         if (this.waveManager) {
             this.waveManager.currentWave = 9; // Will start next as 10
             this.waveManager.startNextWave();
         }
-        
+
         // 2. Give UNIQUE Random Weapons (Fill Inventory)
         const allTypes = Object.keys(WeaponConfig).filter(k => k !== 'AMMO');
         // Shuffle
@@ -745,14 +747,14 @@ export class Game {
             const j = Math.floor(Math.random() * (i + 1));
             [allTypes[i], allTypes[j]] = [allTypes[j], allTypes[i]];
         }
-        
+
         // Take first 9 (or fewer if inventory smaller)
         const maxSlots = 9;
         for (let i = 0; i < Math.min(allTypes.length, maxSlots); i++) {
             this.player.addWeapon(allTypes[i]);
             // Force equip to ensure it registers? No, addWeapon works.
         }
-        
+
         // 3. Full Ammo
         this.player.inventory.forEach(w => {
             if (this.player.weaponState[w]) {
@@ -784,7 +786,7 @@ export class Game {
     beginGameplay() {
         this.isInLobby = false;
         this.mpGameParams.started = true;
-        
+
         this.clearProjectiles(); // Safety clear
 
         document.getElementById('lobby-screen').style.display = 'none';
@@ -878,10 +880,10 @@ export class Game {
     }
 
     spawnRandomDrop(position) {
-         const type = this.getWeightedRandomDrop();
-         if (type) {
-             this.spawnPickup(position, type);
-         }
+        const type = this.getWeightedRandomDrop();
+        if (type) {
+            this.spawnPickup(position, type);
+        }
     }
 
     getWeightedRandomDrop() {
@@ -926,7 +928,7 @@ export class Game {
         const hpPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
         const hpBar = document.getElementById('hp-bar-fill');
         const hpText = document.getElementById('hp-display');
-        
+
         if (hpBar) {
             hpBar.style.width = hpPercent + '%';
             // Dynamic Color
@@ -944,7 +946,7 @@ export class Game {
         if (hpText) hpText.innerText = Math.ceil(this.player.hp);
 
         // 2. Ammo UI (Sync continuously for reliability)
-        this.player.updateAmmoDisplay(); 
+        this.player.updateAmmoDisplay();
     }
 
     animate() {
@@ -968,12 +970,12 @@ export class Game {
             this.fps = this.frameCount;
             this.frameCount = 0;
             this.lastStatsTime = now;
-            
+
             const info = this.renderer.info; // WebGL Info
             const entityCount = this.entityManager ? this.entityManager.enemies.length : 0;
             const projCount = this.projectiles.length;
             const fogDist = this.scene.fog ? `${this.scene.fog.near}-${this.scene.fog.far}` : 'Off';
-            
+
             this.statsDiv.innerHTML = `
                 FPS: ${this.fps}<br>
                 Entities: ${entityCount}<br>
@@ -988,10 +990,10 @@ export class Game {
         const dt = Math.min(this.clock.getDelta(), 0.1); // Clamp dt to prevent huge jumps
 
         // Allow updates if not paused (Input lock check handled inside entities or ignored)
-        if (!this.isPaused) { 
+        if (!this.isPaused) {
             // Update Entities
             this.player.update(dt);
-            
+
             // Orbital Drop Logic (Cinematic)
             if (this.deployState && this.deployState.active) {
                 // Lock horizontal
@@ -999,7 +1001,7 @@ export class Game {
                 this.player.velocity.z = 0;
 
                 const h = this.player.position.y;
-                
+
                 // --- Sky & Atmosphere Physics ---
                 if (this.skyUniforms && this.stars) {
                     if (h > 1000) {
@@ -1013,96 +1015,96 @@ export class Game {
                     } else if (h > 400) {
                         // RE-ENTRY: Red/Orange Glow, Shake
                         const t = (h - 400) / 600; // 0 to 1
-                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x330000), 1-t);
-                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xff4400), 1-t);
+                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x330000), 1 - t);
+                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xff4400), 1 - t);
                         this.stars.material.opacity = t; // Fade stars
-                        this.scene.fog.color.lerp(new THREE.Color(0xff4400), 1-t);
-                        
+                        this.scene.fog.color.lerp(new THREE.Color(0xff4400), 1 - t);
+
                         // Linear Fog Update
                         this.scene.fog.near = 100;
                         this.scene.fog.far = 2000;
-                        
+
                         // Violent Shake
-                        this.player.shakeIntensity = 0.2 + (1-t) * 0.5;
+                        this.player.shakeIntensity = 0.2 + (1 - t) * 0.5;
                         this.player.shakeTime = 0.1;
 
                         // Re-entry Particles (Simple sparks)
                         if (Math.random() < 0.3) {
-                            const offset = new THREE.Vector3((Math.random()-0.5)*5, (Math.random()-0.5)*5, (Math.random()-0.5)*5);
+                            const offset = new THREE.Vector3((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5);
                             const pos = this.player.position.clone().add(offset);
                             this.particleSystem.createExplosion(pos, 0xffaa00, 1); // Reuse explosion as sparks
                         }
                     } else {
                         // TROPOSPHERE: Fade to Day
                         const t = Math.max(0, h / 400); // 0 to 1
-                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x5599ff), 1-t);
-                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xffaa66), 1-t);
-                        this.scene.fog.color.lerp(new THREE.Color(0xddccaa), 1-t); // Dust color
-                        
+                        this.skyUniforms.topColor.value.lerp(new THREE.Color(0x5599ff), 1 - t);
+                        this.skyUniforms.bottomColor.value.lerp(new THREE.Color(0xffaa66), 1 - t);
+                        this.scene.fog.color.lerp(new THREE.Color(0xddccaa), 1 - t); // Dust color
+
                         // Linear Fog Restoration
                         // As we land (h -> 0), fog returns to normal (500-3000)
-                        this.scene.fog.near = 500 * (1-t);
+                        this.scene.fog.near = 500 * (1 - t);
                         this.scene.fog.far = 3000;
-                        
+
                         this.player.shakeIntensity = 0.1 * t;
                     }
                 }
 
                 // HUD Updates based on altitude
                 if (h < 1800 && this.deployState.stage === 0) {
-                     this.updateMissionOverlay("INITIATING REENTRY", "#ff0000");
-                     this.deployState.stage = 1;
+                    this.updateMissionOverlay("INITIATING REENTRY", "#ff0000");
+                    this.deployState.stage = 1;
                 }
                 if (h < 1000 && this.deployState.stage === 1) {
-                     this.updateMissionOverlay("MISSION: KILL ALL MACHINES", "#ff4400");
-                     this.deployState.stage = 2;
+                    this.updateMissionOverlay("MISSION: KILL ALL MACHINES", "#ff4400");
+                    this.deployState.stage = 2;
                 }
                 if (h < 400 && this.deployState.stage === 2) {
-                     this.updateMissionOverlay("ACHIEVE THE CORE", "#00ff00");
-                     this.deployState.stage = 3;
+                    this.updateMissionOverlay("ACHIEVE THE CORE", "#00ff00");
+                    this.deployState.stage = 3;
                 }
-                
+
                 // Re-entry Spark Generation (More frequent & Visible)
                 if (this.deployState.stage >= 1 && h > 400) {
-                    if (Math.random() < 0.8) { 
+                    if (Math.random() < 0.8) {
                         // Spawn in FRONT of player camera
                         const camDir = new THREE.Vector3();
                         this.camera.getWorldDirection(camDir);
                         const offset = camDir.multiplyScalar(5).add(
-                            new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10)
+                            new THREE.Vector3((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10)
                         );
                         const pos = this.player.position.clone().add(offset);
                         if (this.particleSystem && this.particleSystem.createExplosion) {
-                             this.particleSystem.createExplosion(pos, 0xff4400, 3); 
+                            this.particleSystem.createExplosion(pos, 0xff4400, 3);
                         }
                     }
                 }
-                
+
                 // Check Landing
                 // Check Landing (Tunneling Protection)
                 const groundH = this.worldGen ? this.worldGen.getHeight(this.player.position.x, this.player.position.z) : 0;
-                
+
                 // If we are near ground OR passed through it
-                if (h <= groundH + 5) { 
-                     this.deployState.active = false;
-                     this.player.position.y = groundH + 2; // Snap to surface
-                     this.player.velocity.y = 0;
-                     
-                     this.updateMissionOverlay("TOUCHDOWN", "#00ffff");
-                     this.player.shakeTime = 1.0;
-                     this.player.shakeIntensity = 1.0;
-                     
-                     // Fade out overlay
-                     setTimeout(() => { 
+                if (h <= groundH + 5) {
+                    this.deployState.active = false;
+                    this.player.position.y = groundH + 2; // Snap to surface
+                    this.player.velocity.y = 0;
+
+                    this.updateMissionOverlay("TOUCHDOWN", "#00ffff");
+                    this.player.shakeTime = 1.0;
+                    this.player.shakeIntensity = 1.0;
+
+                    // Fade out overlay
+                    setTimeout(() => {
                         const el = document.getElementById('mission-overlay');
-                        if(el) el.style.opacity = 0; 
-                     }, 3000);
-                     
-                     // Big Impact Dust
-                     this.particleSystem.createExplosion(this.player.position, 0x887766, 50);
+                        if (el) el.style.opacity = 0;
+                    }, 3000);
+
+                    // Big Impact Dust
+                    this.particleSystem.createExplosion(this.player.position, 0x887766, 50);
                 }
             }
-            
+
             // Update HUD
             this.updateHUD();
 
@@ -1149,7 +1151,7 @@ export class Game {
                 if (this.getTerrainHeight) {
                     groundY = this.getTerrainHeight(p.mesh.position.x, p.mesh.position.z);
                 }
-                
+
                 p.update(dt, groundY);
                 if (p.shouldRemove) {
                     this.scene.remove(p.mesh);
@@ -1187,7 +1189,7 @@ export class Game {
             if (this.waveManager) this.waveManager.update(dt);
             if (this.collision) this.collision.update(dt);
             this.particleSystem.update(dt);
-            
+
             // Star rotation
             if (this.stars) {
                 this.stars.rotation.y += dt * 0.02; // Slow spin
@@ -1197,10 +1199,10 @@ export class Game {
             this.renderHotbar(); // Keep hotbar synced
             // UI Updates
             this.renderHotbar(); // Keep hotbar synced
-            
+
             // Score Update
             document.getElementById('score-display').innerText = this.player.score;
-            
+
             // Score Update
             document.getElementById('score-display').innerText = this.player.score;
         }
@@ -1209,24 +1211,24 @@ export class Game {
 
         // Render Preview if Inventory Open
         if (this.isPreviewActive && !this.input.isLocked) { // Not locked = menu open roughly
-        // Check if inv menu OR upgrade menu is actually visible
-             const invMenu = document.getElementById('inventory-menu');
-             const upgradeMenu = document.getElementById('upgrade-screen');
-             
-             const showPreview = (invMenu && invMenu.style.display !== 'none') || (upgradeMenu && upgradeMenu.style.display !== 'none');
+            // Check if inv menu OR upgrade menu is actually visible
+            const invMenu = document.getElementById('inventory-menu');
+            const upgradeMenu = document.getElementById('upgrade-screen');
 
-             if (showPreview) {
-             if (showPreview) {
-                 if (this.previewCharacter) {
-                     this.previewCharacter.mesh.rotation.y += 0.01;
-                     // Ensure update is called if needed for animation/lerping
-                     // this.previewCharacter.update(0.016); 
-                 }
-                 if (this.previewApp) {
-                     this.previewApp.renderer.render(this.previewApp.scene, this.previewApp.camera);
-                 }
-             }
-             }
+            const showPreview = (invMenu && invMenu.style.display !== 'none') || (upgradeMenu && upgradeMenu.style.display !== 'none');
+
+            if (showPreview) {
+                if (showPreview) {
+                    if (this.previewCharacter) {
+                        this.previewCharacter.mesh.rotation.y += 0.01;
+                        // Ensure update is called if needed for animation/lerping
+                        // this.previewCharacter.update(0.016); 
+                    }
+                    if (this.previewApp) {
+                        this.previewApp.renderer.render(this.previewApp.scene, this.previewApp.camera);
+                    }
+                }
+            }
         }
     }
 
@@ -1236,22 +1238,22 @@ export class Game {
         this.isPaused = true;
         document.exitPointerLock();
         this.input.keys.attack = false; // Stop shooting
-        
+
         // WAVE COMPLETE HEAL
         const healAmount = Math.floor(this.player.maxHp * 0.5);
         const oldHp = this.player.hp;
         this.player.hp = Math.min(this.player.hp + healAmount, this.player.maxHp);
         const healed = Math.floor(this.player.hp - oldHp);
-        
+
         if (healed > 0) {
             this.player.createFloatingText(this.player.position, `WAVE CLEARED: +${healed} HP`, "#00ff00");
         }
-        
+
         // Update HP
         const hpPercent = (this.player.hp / this.player.maxHp) * 100;
         const hpBar = document.getElementById('hp-bar-fill');
         const hpText = document.getElementById('hp-display');
-        
+
         hpBar.style.width = hpPercent + '%';
         hpText.innerText = Math.ceil(this.player.hp);
 
@@ -1260,7 +1262,7 @@ export class Game {
             hpBar.style.backgroundColor = '#ff0000'; // Critical
             hpBar.style.boxShadow = '0 0 10px #ff0000';
             // Scale effect?
-            hpBar.style.height = '100%'; 
+            hpBar.style.height = '100%';
         } else if (hpPercent < 60) {
             hpBar.style.backgroundColor = '#ffaa00'; // Warning
             hpBar.style.boxShadow = 'none';
@@ -1268,13 +1270,13 @@ export class Game {
             hpBar.style.backgroundColor = '#00ff00'; // Fine
             hpBar.style.boxShadow = 'none';
         }
-        
+
         const upgradeScreen = document.getElementById('upgrade-screen');
         if (upgradeScreen) {
-             upgradeScreen.style.display = 'flex';
-             if (this.upgradeManager) {
-                 this.upgradeManager.showUpgrades();
-             }
+            upgradeScreen.style.display = 'flex';
+            if (this.upgradeManager) {
+                this.upgradeManager.showUpgrades();
+            }
         }
     }
 
@@ -1326,7 +1328,7 @@ export class Game {
         sun.position.set(100, 200, 50);
         sun.castShadow = true;
         this.scene.add(sun);
-        
+
         // Ambient Light (Warm)
         const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x444444, 0.6);
         this.scene.add(hemiLight);
@@ -1337,24 +1339,24 @@ export class Game {
         const starGeo = new THREE.BufferGeometry();
         const starCount = 500;
         const starPos = new Float32Array(starCount * 3);
-        
-        for(let i=0; i<starCount * 3; i+=3) {
+
+        for (let i = 0; i < starCount * 3; i += 3) {
             const r = 3500; // Distance
             // Random spherical coordinates, but keep Y positive
             const theta = 2 * Math.PI * Math.random();
             const phi = Math.acos(1 - Math.random()); // Hemisphere
-            
+
             starPos[i] = r * Math.sin(phi) * Math.cos(theta);
-            starPos[i+1] = Math.abs(r * Math.cos(phi)) + 10; // Ensure Above Horizon + offset
-            starPos[i+2] = r * Math.sin(phi) * Math.sin(theta);
+            starPos[i + 1] = Math.abs(r * Math.cos(phi)) + 10; // Ensure Above Horizon + offset
+            starPos[i + 2] = r * Math.sin(phi) * Math.sin(theta);
         }
-        
+
         starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
         const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false, transparent: true, opacity: 0.8 });
         this.stars = new THREE.Points(starGeo, starMat);
         this.scene.add(this.stars);
     }
-    
+
     updateMissionOverlay(text, color) {
         const el = document.getElementById('mission-overlay');
         if (el) {
@@ -1388,7 +1390,7 @@ export class Game {
             div.style.left = `${x}px`;
             div.style.top = `${y}px`;
             div.style.opacity = parseFloat(div.style.opacity || 1) - 0.01;
-            
+
             // Remove check
             if (parseFloat(div.style.opacity) <= 0) {
                 div.remove();
@@ -1396,10 +1398,10 @@ export class Game {
             }
             requestAnimationFrame(updatePos);
         };
-        
+
         div.style.opacity = '1.0';
         updatePos();
-        
+
         // Timeout backup
         setTimeout(() => div.remove(), 1000);
     }
@@ -1407,29 +1409,29 @@ export class Game {
     // --- BOSS RUSH LOGIC ---
     startBossMatch(loadout) {
         console.log("GAME: Starting Boss Match with Loadout:", loadout);
-        
+
         // 1. Equip Weapons
         this.player.inventory = [];
         this.player.currentSlot = 0;
-        
+
         // Ensure Player has pickup method OR manually add to inventory
         // Assuming Player.addItem(type) or direct inject
         loadout.forEach(type => {
-             // Mock pickup
-             if (!this.player.inventory.includes(type)) {
-                 this.player.inventory.push(type);
-             }
+            // Mock pickup
+            if (!this.player.inventory.includes(type)) {
+                this.player.inventory.push(type);
+            }
         });
-        
+
         // If empty, give default
         if (this.player.inventory.length === 0) this.player.inventory.push('Pistol');
-        
+
         this.player.switchWeapon(0);
 
         // 2. Unpause and Lock Mouse
         this.isPaused = false;
         document.body.requestPointerLock();
-        
+
         // 3. Spawn Boss (Manual Queue for now)
         this.spawnBossQueue();
     }
@@ -1449,21 +1451,21 @@ export class Game {
     }
 
     update(dt) {
-         // Level Update
-         if (this.levelManager) this.levelManager.update(dt);
-         
-         // Old Level Specific Update (Deprecated but keeping for safety if not fully migrated)
-         if (this.currentLevel && this.currentLevel.update) {
-             this.currentLevel.update(dt);
-         }
+        // Level Update
+        if (this.levelManager) this.levelManager.update(dt);
 
-         if (this.mode === 'SPACE_FLIGHT') {
-             this.renderer.render(this.scene, this.camera);
-             return; 
-         }
-         
-         // Main Game Update (Existing)
-         // ...
+        // Old Level Specific Update (Deprecated but keeping for safety if not fully migrated)
+        if (this.currentLevel && this.currentLevel.update) {
+            this.currentLevel.update(dt);
+        }
+
+        if (this.mode === 'SPACE_FLIGHT') {
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+
+        // Main Game Update (Existing)
+        // ...
     }
 
     onWindowResize() {
@@ -1500,14 +1502,14 @@ export class Game {
         this.player.hp = this.player.maxHp; // Heal to full for visual
         this.projectiles = []; // Clear all projectiles
         if (this.entityManager) {
-             // Kill all other enemies to prevent them attacking while player is frozen
-             this.entityManager.enemies.forEach(e => {
-                 if (!e.isDead) {
-                     e.hp = 0;
-                     e.isDead = true;
-                     e.shouldRemove = true;
-                 }
-             });
+            // Kill all other enemies to prevent them attacking while player is frozen
+            this.entityManager.enemies.forEach(e => {
+                if (!e.isDead) {
+                    e.hp = 0;
+                    e.isDead = true;
+                    e.shouldRemove = true;
+                }
+            });
         }
 
         // Force Player Look At Boss
@@ -1526,7 +1528,7 @@ export class Game {
             backgroundColor: 'black', zIndex: '9998', display: 'flex', flexDirection: 'column',
             justifyContent: 'center', alignItems: 'center', opacity: '0', transition: 'opacity 2s'
         });
-        
+
         // BETTER ART: Scattered Debris
         cinematic.innerHTML = `
             <div style="width: 100%; height: 100%; position: relative; overflow: hidden; background: radial-gradient(circle at center, #330000, #000000);">
@@ -1578,15 +1580,15 @@ export class Game {
 
         // 4s: Update Text
         setTimeout(() => {
-             const txt = document.getElementById('cine-text');
-             if(txt) txt.innerText = "COORDINATES ACQUIRED: THE CITADEL";
+            const txt = document.getElementById('cine-text');
+            if (txt) txt.innerText = "COORDINATES ACQUIRED: THE CITADEL";
         }, 4000);
 
         // 8s: Transition
         setTimeout(() => {
-             document.body.removeChild(flash);
-             document.body.removeChild(cinematic);
-             this.loadLevel('CASTLE');
+            document.body.removeChild(flash);
+            document.body.removeChild(cinematic);
+            this.loadLevel('CASTLE');
         }, 8000);
     }
 
@@ -1625,7 +1627,7 @@ export class Game {
                         // Return to menu or continue?
                         // Let's continue for now or end demo.
                         alert("MISSION ACCOMPLISHED. RETURNING TO BASE.");
-                        location.reload(); 
+                        location.reload();
                     }, 2000);
                 }, 3000);
                 return;
@@ -1633,7 +1635,7 @@ export class Game {
 
             container.innerText = lines[index];
             container.style.opacity = 1;
-            
+
             setTimeout(() => {
                 container.style.opacity = 0;
                 setTimeout(() => {
@@ -1642,7 +1644,7 @@ export class Game {
                 }, 1000);
             }, 3000);
         };
-        
+
         setTimeout(showLine, 1000);
     }
 }

@@ -4,100 +4,187 @@ import { Enemy } from './Enemy.js';
 export class KnightEnemy extends Enemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        this.hp = 120; 
-        this.speed = 6.0; 
-        this.damage = 25; 
-        this.scoreValue = 100;
-        this.attackRange = 3.0; 
+
+        this.hp = 150;
+        this.speed = 7.0; // Fast chase
+        this.damage = 25;
+        this.scoreValue = 200;
+        this.attackRange = 4.0;
+        this.attackCooldown = 0;
     }
 
     takeDamage(amount) {
-        // Armor blocks light shots
-        if (amount < 15) {
-            // Deflect sound/spark?
-            return; 
-        }
-        super.takeDamage(amount);
+        // Cyber-Armor: Reduced damage but always shows impact
+        // 30% reduction
+        const actualDamage = amount * 0.7; // 30% resistance
+
+        // Visual/Audio feedback for armor hit could be added here
+        super.takeDamage(actualDamage);
     }
 
     _createMesh() {
         const group = new THREE.Group();
 
-        // Materials
-        const armorMat = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.8, roughness: 0.3 });
-        const jointMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+        // --- CYBER KNIGHT AESTHETIC ---
+        // Dark metallic armor with Neon edgework
+        const armorMat = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            metalness: 0.9,
+            roughness: 0.2,
+            envMapIntensity: 1.0
+        });
 
-        // Torso
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), armorMat);
+        const neonMat = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan Neon
+        const jointMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+
+        // 1. Torso (Angular Plate)
+        const torsoGeo = new THREE.CylinderGeometry(0.3, 0.5, 0.9, 6);
+        const torso = new THREE.Mesh(torsoGeo, armorMat);
         torso.position.y = 1.1;
         group.add(torso);
 
-        // Legs
-        const legGeo = new THREE.BoxGeometry(0.25, 0.9, 0.3);
-        const lLeg = new THREE.Mesh(legGeo, armorMat);
-        lLeg.position.set(-0.2, 0.45, 0);
-        group.add(lLeg);
-        
-        const rLeg = new THREE.Mesh(legGeo, armorMat);
-        rLeg.position.set(0.2, 0.45, 0);
-        group.add(rLeg);
+        // Neon Core
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.1, 0.3, 6), neonMat);
+        core.position.set(0, 1.1, 0.25);
+        core.rotation.x = Math.PI / 2;
+        group.add(core);
 
-        // Pauldrons (Shoulders)
-        const pauldronGeo = new THREE.BoxGeometry(0.3, 0.3, 0.4);
-        const lPaul = new THREE.Mesh(pauldronGeo, armorMat);
-        lPaul.position.set(-0.45, 1.4, 0);
+        // 2. Legs (Hydraulic look)
+        const legGeo = new THREE.BoxGeometry(0.2, 0.9, 0.3);
+        const lLeg = new THREE.Mesh(legGeo, armorMat);
+        lLeg.position.set(-0.25, 0.45, 0);
+
+        // Kneepad
+        const knee = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.32), neonMat);
+        knee.position.y = 0.0;
+        knee.position.z = 0.05;
+        lLeg.add(knee);
+
+        group.add(lLeg);
+        this.leftLeg = lLeg; // Anim ref
+
+        const rLeg = lLeg.clone();
+        rLeg.position.set(0.25, 0.45, 0);
+        group.add(rLeg);
+        this.rightLeg = rLeg; // Anim ref
+
+        // 3. Pauldrons (Spiked)
+        const shoulderGeo = new THREE.ConeGeometry(0.3, 0.6, 4);
+        const lPaul = new THREE.Mesh(shoulderGeo, armorMat);
+        lPaul.position.set(-0.55, 1.5, 0);
+        lPaul.rotation.z = Math.PI / 4;
         group.add(lPaul);
 
-        const rPaul = new THREE.Mesh(pauldronGeo, armorMat);
-        rPaul.position.set(0.45, 1.4, 0);
+        const rPaul = lPaul.clone();
+        rPaul.position.set(0.55, 1.5, 0);
+        rPaul.rotation.z = -Math.PI / 4;
         group.add(rPaul);
 
-        // Head (Bucket Helm)
-        const head = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.5, 8), armorMat);
+        // 4. Head (Tech Helm)
+        const headGeo = new THREE.BoxGeometry(0.35, 0.4, 0.45);
+        const head = new THREE.Mesh(headGeo, armorMat);
         head.position.y = 1.75;
         group.add(head);
 
-        // Eye Slit
-        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.2), new THREE.MeshStandardMaterial({ color: 0x000000 }));
-        slit.position.set(0, 1.75, 0.15);
-        group.add(slit);
+        // Visor (V-Shape Neon)
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.05, 0.2), neonMat);
+        visor.position.set(0, 1.75, 0.15);
+        group.add(visor);
 
-        // Sword Arm
-        const armGeo = new THREE.BoxGeometry(0.2, 0.7, 0.2);
-        const rArm = new THREE.Mesh(armGeo, armorMat);
-        rArm.position.set(0.5, 1.0, 0);
-        group.add(rArm);
+        // Halo?
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.02, 8, 32), neonMat);
+        halo.position.set(0, 2.1, 0);
+        halo.rotation.x = Math.PI / 2;
+        group.add(halo);
 
-        // Energy Sword (Greatsword)
-        const swordBladeGeo = new THREE.BoxGeometry(0.1, 2.0, 0.3); // Wide blade
-        const swordMat = new THREE.MeshStandardMaterial({ 
-            color: 0x00ffff, 
-            emissive: 0x00ffff, 
-            emissiveIntensity: 2.0 
+        // 5. Digital Greatsword
+        const bladeGeo = new THREE.BoxGeometry(0.1, 2.5, 0.4);
+        // Gradient shader or just simple neon? Let's use neon for now.
+        const bladeMat = new THREE.MeshStandardMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 2.0,
+            transparent: true,
+            opacity: 0.8
         });
-        this.sword = new THREE.Mesh(swordBladeGeo, swordMat);
-        this.sword.position.set(0.5, 1.5, 0.5); // Hand position
-        this.sword.rotation.x = Math.PI/4;
-        group.add(this.sword);
-        
-        // Hilt
-        const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), jointMat);
-        hilt.rotation.z = Math.PI/2;
-        hilt.position.y = -1.0; // Relative to blade center
+
+        this.sword = new THREE.Mesh(bladeGeo, bladeMat);
+        this.sword.position.set(0.6, 1.5, 0.4);
+        this.sword.rotation.x = Math.PI / 2; // Point forward-ish
+
+        // Sword Handle
+        const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8), jointMat);
+        hilt.rotation.x = Math.PI / 2;
+        hilt.position.y = -1.4;
         this.sword.add(hilt);
-        
+
+        group.add(this.sword);
+
         return group;
     }
 
     update(dt, playerPos) {
         super.update(dt, playerPos);
         this.updateGroundPosition();
-        
-        // Spin sword if close
+
+        if (this.isDead) return;
+
+        // --- AI LOGIC ---
         const dist = this.mesh.position.distanceTo(playerPos);
-        if (dist < 5) {
-            this.sword.rotation.z += 10 * dt; // Attack anim
+
+        // 1. Face Player
+        this.mesh.lookAt(playerPos.x, this.mesh.position.y, playerPos.z);
+
+        // 2. Chase or Attack
+        if (dist > this.attackRange) {
+            // Chase
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+            this.mesh.position.add(forward.multiplyScalar(this.speed * dt));
+
+            // Run Anim
+            this.animRun(dt);
+        } else {
+            // Attack
+            if (this.attackCooldown <= 0) {
+                this.attackCooldown = 1.5; // Seconds
+                this.playAnimation('attack');
+                // Deal Damage logic is handled by Collision system usually, 
+                // but we can also trigger a "swing" that Collision detects.
+                // For now, Collision.js checks "Enemies vs Player" constant contact.
+                // We should make Collision.js check "Enemy Weapon vs Player"? 
+                // Or just keep simple contact damage for now, or "Lunging".
+
+                // Let's lunge forward
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+                this.mesh.position.add(forward.multiplyScalar(2.0)); // Lunge
+            }
+        }
+
+        if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    }
+
+    animRun(dt) {
+        // Simple Leg Swing
+        const time = Date.now() * 0.01;
+        if (this.leftLeg && this.rightLeg) {
+            this.leftLeg.rotation.x = Math.sin(time) * 0.5;
+            this.rightLeg.rotation.x = Math.cos(time) * 0.5;
+        }
+        // Bob
+        this.mesh.position.y += Math.sin(time * 2) * 0.02;
+    }
+
+    animAttack(t) {
+        // Sword Swing
+        if (this.sword) {
+            // Simple chop
+            // t is 0..duration
+            // We need to implement proper animation state in Enemy.js to pass 't' properly,
+            // or just use sin wave here if 'attack' state is active.
+            // Enemy.js calls animAttack(this.animTimer).
+
+            const phase = Math.sin(t * 10); // rapid swing
+            this.sword.rotation.x = (Math.PI / 2) - phase;
         }
     }
 }

@@ -53,20 +53,20 @@ export class Collision {
             // Sub-stepping for High Velocity Detection
             const steps = 8; // Increased from 4 to 8 for fast bullets
             const stepDt = (this.dt || 0.016) / steps;
-            
+
             for (let s = 0; s < steps; s++) {
                 if (proj.shouldRemove) break;
 
                 // Simple check at interpolated position
                 const factor = (s + 1) / steps;
-                
+
                 // Optimized Vector Math (Use separate vectors to avoid reference clash)
                 // 1. Calculate Offset into _tempVec2
                 this._tempVec2.copy(proj.velocity).multiplyScalar((this.dt || 0.016) * (1 - factor));
-                
+
                 // 2. Calculate Check Position: Pos - Offset
                 this._tempVec.copy(proj.mesh.position).sub(this._tempVec2);
-                
+
                 // Temp check box at this interpolated position
                 this._tempBox1.setFromCenterAndSize(
                     this._tempVec, // Center
@@ -76,11 +76,12 @@ export class Collision {
                 if (proj.isPlayerProjectile) {
                     for (const enemy of this.enemies) {
                         if (enemy.isDead) continue;
-                        
+
                         // Optimized Enemy Box (No alloc)
                         this._tempBox2.setFromObject(enemy.mesh);
 
                         if (this._tempBox1.intersectsBox(this._tempBox2)) {
+                            console.log("Hit registered on enemy!", enemy.constructor.name);
                             if (proj.isExplosive) {
                                 this.createExplosion(this._tempVec, proj.explosionRadius, proj.damage, false);
                             } else {
@@ -93,8 +94,8 @@ export class Collision {
                 } else {
                     // Player Hitbox Fix
                     const centerPos = this.player.position.clone(); // Can optimize this too but it's once per step
-                    centerPos.y -= 0.8; 
-                    
+                    centerPos.y -= 0.8;
+
                     this._tempBox2.setFromCenterAndSize(
                         centerPos,
                         this._tempSize.set(0.6, 1.8, 0.6)
@@ -125,7 +126,7 @@ export class Collision {
             // Calculate attackPos without clone
             // attackPos = pos + dir * 1.5
             this._tempVec.copy(this.player.position).addScaledVector(playerDir, 1.5);
-            
+
             this._tempBox1.setFromCenterAndSize(
                 this._tempVec,
                 this._tempSize.set(1.5, 2.0, 1.5)
@@ -142,24 +143,64 @@ export class Collision {
         }
 
         // 3. Enemies vs Player (Melee contact)
+        // 3. Enemies vs Player (Melee contact)
         // Optimization: Calculate player box once
-        const centerPos = this.player.position.clone();
-        centerPos.y -= 0.8; 
-        const playerBox = this._tempBox1.setFromCenterAndSize(
-            centerPos,
+        // Re-use _tempBox1 for player box
+        // NOTE: We need to use setFromCenterAndSize into a variable we keep valid for the loop
+        // But _tempBox1 is reused inside checkCollision if we are not careful?
+        // Utils.checkCollision typically takes two boxes.
+
+        // Let's use _tempBox1 for Player and _tempBox2 for Enemy. 
+        // We need to ensure we don't overwrite _tempBox1 while iterating.
+
+        // Player Box Construction (No Clone)
+        this._tempVec.copy(this.player.position);
+        this._tempVec.y -= 0.8;
+
+        this._tempBox1.setFromCenterAndSize(
+            this._tempVec,
             this._tempSize.set(0.5, 1.8, 0.5)
         );
 
         for (const enemy of this.enemies) {
             if (enemy.isDead) continue;
-            const enemyBox = new THREE.Box3().setFromObject(enemy.mesh);
 
-            if (Utils.checkCollision(playerBox, enemyBox)) {
+            // Optimization: No new Box3()
+            this._tempBox2.setFromObject(enemy.mesh);
+
+            // Utils.checkCollision(box1, box2) - Check if it modifies boxes? 
+            // Usually intersectsBox is read-only.
+            if (this._tempBox1.intersectsBox(this._tempBox2)) {
                 if (enemy.isExplosive || enemy instanceof ExplosiveEnemy) {
                     this.createExplosion(enemy.mesh.position, 5.0, enemy.damage, true);
                     enemy.die();
                 } else {
                     this.player.takeDamage(0.5);
+                }
+            }
+
+            // NEW: Active Melee Attack Logic (Sword/Lance/Baton)
+            // If enemy is attacking AND close enough, deal damage.
+            // This fixes the issue where enemies swing but don't hit because body is far.
+            if (enemy.currentAnim === 'attack' && enemy.damage > 0) {
+                const dist = enemy.mesh.position.distanceTo(this.player.position);
+                // Grace period? Or continuous? 
+                // Let's rely on cooldown in Enemy class, but here we check proximity.
+                // Attack Range + 1.0 buffer
+                if (dist < (enemy.attackRange || 3.0) + 1.5) {
+                    // Deal damage!
+                    // To avoid 60 hits per second, we need a cooldown or state check.
+                    // But Enemy.js manages 'attack' state duration.
+                    // Simplest fix: Low damage per frame OR check a flag 'hasDealtDamage'.
+                    // Let's do low continuous damage simulating a "grinder" or adding a flag to enemy.
+
+                    if (!enemy.hasDealtAttackDamage) {
+                        this.player.takeDamage(enemy.damage);
+                        enemy.hasDealtAttackDamage = true; // Reset this when attack starts in Enemy.js
+
+                        // Debug
+                        /* console.log("Enemy Hit Player!", enemy.constructor.name); */
+                    }
                 }
             }
         }
