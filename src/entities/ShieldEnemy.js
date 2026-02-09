@@ -5,11 +5,11 @@ export class ShieldEnemy extends Enemy {
     constructor(scene, position) {
         super(scene, position);
 
-        this.hp = 250; // Very Tanky
+        this.hp = 150; // Reduced from 250
         this.speed = 2.5; // Slow approach
         this.damage = 15;
         this.scoreValue = 150;
-        this.shieldHealth = 150;
+        this.shieldHealth = 100; // Reduced from 150
         this.isShieldActive = true;
         this.attackRange = 3.0;
         this.attackCooldown = 0;
@@ -144,9 +144,9 @@ export class ShieldEnemy extends Enemy {
         // Shield blocking logic
         if (this.isShieldActive) {
             // Check direction? For now assume frontal block if facing player
-            // Reduce damage by 80% (User feedback: "Invincible" was bad)
-            const blockedAmount = amount * 0.8;
-            const appliedAmount = amount * 0.2;
+            // Reduce damage by 50% (User feedback: "Invincible" was bad)
+            const blockedAmount = amount * 0.5;
+            const appliedAmount = amount * 0.5;
 
             this.shieldHealth -= amount; // Shield takes full damage
             super.takeDamage(appliedAmount); // HP takes reduced
@@ -192,6 +192,21 @@ export class ShieldEnemy extends Enemy {
             // Swing down
             const angle = Math.sin(t * 10) * Math.PI / 2;
             this.weapon.rotation.x = angle;
+        }
+    }
+
+    animDie(t) {
+        // Shield drops, Mech falls back
+        this.mesh.rotation.x = -t * Math.PI / 2; // Fall back
+
+        if (this.shieldGroup) {
+            this.shieldGroup.position.y -= 0.05;
+            this.shieldGroup.rotation.x += 0.1;
+        }
+
+        // Light flickers out
+        if (t > 0.5 && this.eyeMesh) {
+            this.eyeMesh.visible = false;
         }
     }
 }

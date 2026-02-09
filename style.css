@@ -65,8 +65,19 @@ body {
     opacity: 0.8;
 }
 
-#crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
-#crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
+#crosshair::before {
+    top: 9px;
+    left: 0;
+    width: 20px;
+    height: 2px;
+}
+
+#crosshair::after {
+    top: 0;
+    left: 9px;
+    width: 2px;
+    height: 20px;
+}
 
 /* Grid Layout */
 #hud-grid {
@@ -153,26 +164,22 @@ body {
 
 #hp-bar-fill {
     height: 100%;
-    background: repeating-linear-gradient(
-        90deg,
-        var(--hud-highlight),
-        var(--hud-highlight) 4px,
-        #000 4px,
-        #000 5px
-    );
+    background: repeating-linear-gradient(90deg,
+            var(--hud-highlight),
+            var(--hud-highlight) 4px,
+            #000 4px,
+            #000 5px);
     box-shadow: 0 0 5px var(--hud-highlight);
     transition: width 0.2s;
 }
 
 #armor-bar-fill {
     height: 100%;
-    background: repeating-linear-gradient(
-        90deg,
-        #66f,
-        #66f 4px,
-        #000 4px,
-        #000 5px
-    );
+    background: repeating-linear-gradient(90deg,
+            #66f,
+            #66f 4px,
+            #000 4px,
+            #000 5px);
 }
 
 .value {
@@ -192,7 +199,9 @@ body {
     box-shadow: none;
 }
 
-#hud-center .panel-header, #hud-center::before, #hud-center::after {
+#hud-center .panel-header,
+#hud-center::before,
+#hud-center::after {
     display: none;
 }
 
@@ -267,8 +276,13 @@ body {
 }
 
 @keyframes radarSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* CRT Scanlines updated */
@@ -278,14 +292,12 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
-        repeating-linear-gradient(
-            0deg,
+    background:
+        repeating-linear-gradient(0deg,
             rgba(0, 0, 0, 0.15),
             rgba(0, 0, 0, 0.15) 1px,
             transparent 1px,
-            transparent 3px
-        );
+            transparent 3px);
     pointer-events: none;
     z-index: 500;
     mix-blend-mode: overlay;
@@ -298,35 +310,84 @@ body {
     border: 2px solid rgba(0, 255, 255, 0.5);
 }
 
-.visor-corner.top-left { top: 20px; left: 20px; border-right: none; border-bottom: none; }
-.visor-corner.top-right { top: 20px; right: 20px; border-left: none; border-bottom: none; }
-.visor-corner.bottom-left { bottom: 20px; left: 20px; border-right: none; border-top: none; }
-.visor-corner.bottom-right { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+.visor-corner.top-left {
+    top: 20px;
+    left: 20px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.visor-corner.top-right {
+    top: 20px;
+    right: 20px;
+    border-left: none;
+    border-bottom: none;
+}
+
+.visor-corner.bottom-left {
+    bottom: 20px;
+    left: 20px;
+    border-right: none;
+    border-top: none;
+}
+
+.visor-corner.bottom-right {
+    bottom: 20px;
+    right: 20px;
+    border-left: none;
+    border-top: none;
+}
 
 .scanline {
     width: 100%;
     height: 100%;
-    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.2) 50%, rgba(0, 0, 0, 0.2));
     background-size: 100% 4px;
     animation: scrollScan 10s linear infinite;
     opacity: 0.1;
     position: absolute;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
 }
 
 @keyframes scrollScan {
-    0% { background-position: 0 0; }
-    100% { background-position: 0 100%; }
+    0% {
+        background-position: 0 0;
+    }
+
+    100% {
+        background-position: 0 100%;
+    }
 }
 
 @keyframes hudFlicker {
-    0% { opacity: 1; }
-    95% { opacity: 1; }
-    96% { opacity: 0.8; }
-    97% { opacity: 1; }
-    98% { opacity: 0.5; }
-    99% { opacity: 1; }
-    100% { opacity: 1; }
+    0% {
+        opacity: 1;
+    }
+
+    95% {
+        opacity: 1;
+    }
+
+    96% {
+        opacity: 0.8;
+    }
+
+    97% {
+        opacity: 1;
+    }
+
+    98% {
+        opacity: 0.5;
+    }
+
+    99% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 1;
+    }
 }
 
 /* KEEP EXISTING MENU STYLES BELOW THIS */
@@ -335,14 +396,18 @@ body {
 /* --- Artistic Shell Menu --- */
 #robot-face-container {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: #000;
     display: flex;
     justify-content: center;
     align-items: center;
-    flex-direction: column; /* Allow stacking title above face */
-    z-index: 2100; /* Highest priority */
+    flex-direction: column;
+    /* Allow stacking title above face */
+    z-index: 2100;
+    /* Highest priority */
     cursor: pointer;
     pointer-events: auto;
 }
@@ -353,7 +418,8 @@ body {
     font-family: 'Black Ops One', cursive;
     font-size: 80px;
     color: #4af626;
-    text-shadow: 0 0 20px #4af626, 0 0 40px #0f0; /* Glowing effect */
+    text-shadow: 0 0 20px #4af626, 0 0 40px #0f0;
+    /* Glowing effect */
     z-index: 2200;
     letter-spacing: 10px;
     pointer-events: none;
@@ -361,8 +427,17 @@ body {
 }
 
 @keyframes titlePulse {
-    0%, 100% { opacity: 0.8; text-shadow: 0 0 20px #4af626; }
-    50% { opacity: 1; text-shadow: 0 0 40px #4af626, 0 0 60px #0f0; }
+
+    0%,
+    100% {
+        opacity: 0.8;
+        text-shadow: 0 0 20px #4af626;
+    }
+
+    50% {
+        opacity: 1;
+        text-shadow: 0 0 40px #4af626, 0 0 60px #0f0;
+    }
 }
 
 #robot-face-container:hover #face-hint {
@@ -371,8 +446,10 @@ body {
 
 #menu-mouth {
     position: absolute;
-    top: 68%; /* Lowered further */
-    left: 55%; /* Near right eye */
+    top: 68%;
+    /* Lowered further */
+    left: 55%;
+    /* Near right eye */
     font-family: 'Courier New', monospace;
     font-size: 64px;
     color: #4af626;
@@ -386,8 +463,15 @@ body {
 }
 
 @keyframes mouthBob {
-    0%, 100% { transform: rotate(90deg) translateX(0); }
-    50% { transform: rotate(90deg) translateX(-5px); }
+
+    0%,
+    100% {
+        transform: rotate(90deg) translateX(0);
+    }
+
+    50% {
+        transform: rotate(90deg) translateX(-5px);
+    }
 }
 
 /* Dizziness Class - Applied via JS */
@@ -397,8 +481,10 @@ body {
 
 #shell-container {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: #000;
     color: #4af626;
     font-family: 'Courier New', monospace;
@@ -429,9 +515,17 @@ body {
 }
 
 /* Scrollbar for terminal */
-.terminal-body::-webkit-scrollbar { width: 8px; }
-.terminal-body::-webkit-scrollbar-thumb { background: #333; }
-.terminal-body::-webkit-scrollbar-track { background: #000; }
+.terminal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-body::-webkit-scrollbar-thumb {
+    background: #333;
+}
+
+.terminal-body::-webkit-scrollbar-track {
+    background: #000;
+}
 
 .input-line {
     display: flex;
@@ -450,7 +544,8 @@ body {
     flex: 1;
     background: transparent;
     border: none;
-    color: #fff; /* White text for contrast */
+    color: #fff;
+    /* White text for contrast */
     font-family: 'Courier New', monospace;
     font-size: 16px;
     outline: none;
@@ -481,7 +576,8 @@ body {
 #inventory-menu::before {
     content: 'ROOT@SYSTEM:~/INVENTORY';
     position: absolute;
-    top: -24px; left: -2px;
+    top: -24px;
+    left: -2px;
     background: #0f0;
     color: #000;
     padding: 2px 10px;
@@ -560,7 +656,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    border-left: 1px solid #0f0; /* Double border effect */
+    border-left: 1px solid #0f0;
+    /* Double border effect */
 }
 
 #player-preview-container {
@@ -577,8 +674,10 @@ body {
 /* Upgrade Screen - Linux Server Terminal Style */
 #upgrade-screen {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: #000;
     z-index: 3000;
     display: flex;
@@ -666,9 +765,18 @@ body {
 }
 
 /* Custom Scrollbar */
-.upgrade-grid::-webkit-scrollbar { width: 10px; }
-.upgrade-grid::-webkit-scrollbar-track { background: #001100; border-left: 1px solid #0f0; }
-.upgrade-grid::-webkit-scrollbar-thumb { background: #0f0; }
+.upgrade-grid::-webkit-scrollbar {
+    width: 10px;
+}
+
+.upgrade-grid::-webkit-scrollbar-track {
+    background: #001100;
+    border-left: 1px solid #0f0;
+}
+
+.upgrade-grid::-webkit-scrollbar-thumb {
+    background: #0f0;
+}
 
 .upgrade-card {
     background: #000;
@@ -736,6 +844,7 @@ body {
     cursor: pointer;
     align-self: flex-start;
 }
+
 #btn-skip-upgrade:hover {
     background: #f00;
     color: #000;
@@ -747,33 +856,116 @@ body {
 }
 
 /* Game Over - Ensure High Z */
+/* Game Over - Cyber Style */
 #game-over-screen {
     z-index: 5000;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(10, 0, 0, 0.95);
+    background: rgba(0, 5, 0, 0.95);
     padding: 60px;
     border: 2px solid #f00;
     text-align: center;
     color: #fff;
-    box-shadow: 0 0 50px rgba(255, 0, 0, 0.4);
-    min-width: 500px;
+    box-shadow: 0 0 50px rgba(255, 0, 0, 0.4), inset 0 0 50px rgba(50, 0, 0, 0.5);
+    min-width: 600px;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    /* Ensure clickable */
+    display: flex;
+    /* Flexbox for layout */
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+#game-over-screen::before {
+    content: 'SYSTEM CRITICAL FAILURE';
+    position: absolute;
+    top: -15px;
+    background: #000;
+    color: #f00;
+    padding: 0 10px;
+    border: 1px solid #f00;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
 }
 
 #game-over-screen h1 {
     font-family: 'Black Ops One', cursive;
-    font-size: 64px;
+    font-size: 72px;
     color: #f00;
-    text-shadow: 0 0 20px #f00;
-    margin: 0 0 20px 0;
+    text-shadow: 0 0 20px #f00, 0 0 40px #800;
+    margin: 0;
+    letter-spacing: 5px;
+    animation: textFlash 2s infinite;
+}
+
+@keyframes textFlash {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+
+    55% {
+        opacity: 1;
+    }
+
+    95% {
+        opacity: 0.9;
+    }
+
+    96% {
+        opacity: 0.5;
+    }
+
+    97% {
+        opacity: 1;
+    }
+}
+
+.skull-container {
+    display: flex;
+    gap: 20px;
+    font-size: 32px;
+    color: #f00;
+    opacity: 0.8;
+}
+
+#final-score {
+    font-family: 'Courier New', monospace;
+    font-size: 24px;
+    color: #fff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+    width: 100%;
+}
+
+#btn-restart {
+    margin-top: 20px;
+    border-color: #f00;
+    color: #f00;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+}
+
+#btn-restart:hover {
+    background: #f00;
+    color: #000;
+    box-shadow: 0 0 20px #f00;
 }
 
 /* Pause Menu - Cyber Style */
 #pause-menu {
     border: 4px solid var(--primary-color);
-    background: rgba(0, 10, 0, 0.95) !important; /* Force darker opacity */
+    background: rgba(0, 10, 0, 0.95) !important;
+    /* Force darker opacity */
     box-shadow: 0 0 50px rgba(0, 255, 0, 0.2), inset 0 0 50px rgba(0, 50, 0, 0.5);
     backdrop-filter: blur(10px);
 }
@@ -807,8 +999,10 @@ body {
 .menu-btn::before {
     content: '';
     position: absolute;
-    top: 0; left: -100%;
-    width: 100%; height: 100%;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
     background: var(--hud-highlight);
     transition: left 0.3s;
     z-index: -1;
@@ -829,15 +1023,18 @@ body {
 /* Terminal Boot Sequence Styles */
 #boot-sequence {
     position: absolute;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     background: #000;
     color: #0f0;
     font-family: 'Courier New', monospace;
     z-index: 9999;
     padding: 20px;
     overflow: hidden;
-    display: none; /* Toggled by JS */
+    display: none;
+    /* Toggled by JS */
 }
 
 #boot-text {
@@ -856,37 +1053,83 @@ body {
     vertical-align: bottom;
 }
 
-@keyframes blink { 50% { opacity: 0; } }
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
 
 .glitch-transition {
     animation: glitchAnim 0.3s steps(5) forwards;
 }
 
 @keyframes glitchAnim {
-    0% { transform: translate(0); filter: none; }
-    20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
-    40% { transform: translate(2px, -2px); filter: hue-rotate(-90deg); }
-    60% { transform: translate(-1px, 1px); filter: invert(0.2); }
-    80% { transform: translate(1px, -1px); }
-    100% { transform: translate(0); filter: none; }
+    0% {
+        transform: translate(0);
+        filter: none;
+    }
+
+    20% {
+        transform: translate(-2px, 2px);
+        filter: hue-rotate(90deg);
+    }
+
+    40% {
+        transform: translate(2px, -2px);
+        filter: hue-rotate(-90deg);
+    }
+
+    60% {
+        transform: translate(-1px, 1px);
+        filter: invert(0.2);
+    }
+
+    80% {
+        transform: translate(1px, -1px);
+    }
+
+    100% {
+        transform: translate(0);
+        filter: none;
+    }
 }
 
 .shutters {
     position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     z-index: 9998;
     pointer-events: none;
-    display: none; /* Hide by default so Menu is visible */
+    display: none;
+    /* Hide by default so Menu is visible */
 }
 
-.shutter-top, .shutter-bottom {
+.shutter-top,
+.shutter-bottom {
     position: absolute;
-    left: 0; width: 100%; height: 50%;
+    left: 0;
+    width: 100%;
+    height: 50%;
     background: #000;
     transition: transform 0.5s cubic-bezier(0.8, 0, 0.2, 1);
 }
-.shutter-top { top: 0; transform-origin: top; }
-.shutter-bottom { bottom: 0; transform-origin: bottom; }
 
-.shutters.open .shutter-top { transform: scaleY(0); }
-.shutters.open .shutter-bottom { transform: scaleY(0); }
+.shutter-top {
+    top: 0;
+    transform-origin: top;
+}
+
+.shutter-bottom {
+    bottom: 0;
+    transform-origin: bottom;
+}
+
+.shutters.open .shutter-top {
+    transform: scaleY(0);
+}
+
+.shutters.open .shutter-bottom {
+    transform: scaleY(0);
+}

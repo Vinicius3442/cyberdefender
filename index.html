@@ -78,18 +78,23 @@
             </div>
         </div>
 
-        <div id="boss-container" style="display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); width: 600px; text-align: center;">
-            <div id="boss-name" style="color: #f00; font-family: 'Black Ops One'; font-size: 24px; text-shadow: 0 0 10px #f00; margin-bottom: 5px;">BOSS NAME</div>
+        <div id="boss-container"
+            style="display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); width: 600px; text-align: center;">
+            <div id="boss-name"
+                style="color: #f00; font-family: 'Black Ops One'; font-size: 24px; text-shadow: 0 0 10px #f00; margin-bottom: 5px;">
+                BOSS NAME</div>
             <div style="width: 100%; height: 20px; background: #330000; border: 2px solid #f00;">
                 <div id="boss-hp-bar" style="width: 100%; height: 100%; background: #f00;"></div>
             </div>
         </div>
 
-        <div id="lore-message" style="display: none; position: absolute; top: 30%; left: 0; width: 100%; text-align: center; color: #ff3300; font-family: 'Courier New'; font-size: 32px; font-weight: bold; text-shadow: 0 0 10px #ff0000; animation: blink 0.5s infinite;">
+        <div id="lore-message"
+            style="display: none; position: absolute; top: 30%; left: 0; width: 100%; text-align: center; color: #ff3300; font-family: 'Courier New'; font-size: 32px; font-weight: bold; text-shadow: 0 0 10px #ff0000; animation: blink 0.5s infinite;">
             WARNING: HIGH ENERGY SIGNATURE DETECTED
         </div>
-        
-        <div id="mission-overlay" style="position: absolute; top: 15%; width: 100%; text-align: center; font-family: 'Black Ops One', cursive; font-size: 56px; text-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 50;">
+
+        <div id="mission-overlay"
+            style="position: absolute; top: 15%; width: 100%; text-align: center; font-family: 'Black Ops One', cursive; font-size: 56px; text-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 50;">
         </div>
 
         <div id="wave-progress-container">
@@ -102,18 +107,23 @@
             <h1 id="game-title">CYBER PROTOCOL</h1>
             <canvas id="robot-face-canvas"></canvas>
             <div id="menu-mouth">)</div>
-            <div id="face-hint" style="position: absolute; bottom: 50px; width: 100%; text-align: center; font-family: 'Courier New'; color: #0f0; opacity: 0; transition: opacity 2s;">[ CLICK TO WAKE ]</div>
+            <div id="face-hint"
+                style="position: absolute; bottom: 50px; width: 100%; text-align: center; font-family: 'Courier New'; color: #0f0; opacity: 0; transition: opacity 2s;">
+                [ CLICK TO WAKE ]</div>
         </div>
 
-        <div id="os-boot-screen" style="display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:#000; color:#4af626; font-family: 'Courier New', monospace; z-index: 5000; flex-direction: column; align-items: center; justify-content: center;">
-            <div id="boot-logo" style="width: 150px; height: 150px; border: 4px solid #4af626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px #4af626;">
+        <div id="os-boot-screen"
+            style="display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:#000; color:#4af626; font-family: 'Courier New', monospace; z-index: 5000; flex-direction: column; align-items: center; justify-content: center;">
+            <div id="boot-logo"
+                style="width: 150px; height: 150px; border: 4px solid #4af626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px #4af626;">
                 <div style="font-size: 64px;">⚡</div>
             </div>
             <h1 style="font-size: 48px; margin-bottom: 10px; text-shadow: 0 0 10px #4af626;">CYBER OS</h1>
             <div style="font-size: 14px; margin-bottom: 40px; opacity: 0.8;">v9.0.42 KERNEL DETECTED</div>
-            
+
             <div class="boot-bar-container" style="width: 60%; height: 20px; border: 2px solid #4af626; padding: 2px;">
-                <div id="boot-bar-fill" style="width: 0%; height: 100%; background: #4af626; box-shadow: 0 0 10px #4af626;"></div>
+                <div id="boot-bar-fill"
+                    style="width: 0%; height: 100%; background: #4af626; box-shadow: 0 0 10px #4af626;"></div>
             </div>
             <div id="boot-status" style="margin-top: 10px; font-size: 16px;">INITIALIZING...</div>
         </div>
@@ -133,7 +143,7 @@
         <div id="boot-sequence" style="display: none;">
             <div id="boot-text"></div>
         </div>
-        
+
         <!-- Shutters for wake-up anim -->
         <div id="shutters" class="shutters">
             <div class="shutter-top"></div>
@@ -160,17 +170,7 @@
         </div>
 
         <div id="game-over-screen" style="display: none;">
-            <div class="skull-container">
-                <div class="skull">💀</div>
-                <div class="skull">💀</div>
-                <div class="skull">💀</div>
-            </div>
             <h1>TERMINATED</h1>
-            <div class="skull-container">
-                <div class="skull">💀</div>
-                <div class="skull">💀</div>
-                <div class="skull">💀</div>
-            </div>
             <p id="final-score">SCORE: 0</p>
             <p id="submission-status" style="color: #0ff; margin-bottom: 20px;">Submitting Score...</p>
             <button id="btn-restart" class="menu-btn primary" onclick="location.reload()">RE-DEPLOY</button>

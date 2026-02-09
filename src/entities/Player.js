@@ -279,8 +279,9 @@ export class Player {
 
 
 
-    takeDamage(amount) {
+    takeDamage(amount, source = "UNKNOWN") {
         if (this.isDead) return;
+        this.lastDamageSource = source; // Track cause of death
         // Spawn Protection
         if (this.isInvulnerable) return;
 

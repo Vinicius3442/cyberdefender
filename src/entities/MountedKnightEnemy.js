@@ -77,57 +77,81 @@ export class MountedKnightEnemy extends Enemy {
     }
 
     update(dt, playerPos) {
-        // Handle Charge Animation/Logic
+        this.updateAnimations(dt);
+
+        // --- HOVER BIKE MOVEMENT ---
+        // Unlike humanoids, this needs smooth turning and momentum.
+        const dist = this.mesh.position.distanceTo(playerPos);
+        const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+        toPlayer.y = 0; // Project to ground plane
+
+        const currentDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+
+        // 1. TURNING
+        // Calculate angle to target
+        const angle = currentDir.angleTo(toPlayer);
+        // Cross product to check left/right
+        const cross = new THREE.Vector3().crossVectors(currentDir, toPlayer);
+
+        const turnRate = 2.0 * dt; // Slow turn
+        if (angle > 0.05) {
+            // Turn towards player
+            this.mesh.rotateY(cross.y > 0 ? turnRate : -turnRate);
+
+            // Bank effect (lean)
+            this.chassis.rotation.z = THREE.MathUtils.lerp(this.chassis.rotation.z, cross.y > 0 ? -0.3 : 0.3, dt * 2);
+        } else {
+            // Straighten up
+            this.chassis.rotation.z = THREE.MathUtils.lerp(this.chassis.rotation.z, 0, dt * 2);
+        }
+
+        // 2. VELOCITY
         if (this.isCharging) {
             this.chargeDuration -= dt;
+            // Move fast in current facing direction
+            this.mesh.translateZ(this.speed * dt);
 
-            // Move strictly in chargeDir
-            this.mesh.position.add(this.chargeDir.clone().multiplyScalar(this.speed * dt));
-
-            // Wobble effect
-            this.chassis.rotation.z = Math.sin(Date.now() * 0.02) * 0.05;
-
-            // DAMNAGE CHECK (Manual)
-            const dist = this.mesh.position.distanceTo(playerPos);
-            if (dist < 2.5) {
-                // Hitted player
-                // We need a reference to the player entity to call takeDamage
-                // But update() only gets playerPos (Vector3).
-                // ... Wait, Collision.js handles body collision.
-                // But this enemy moves fast, might tunnel.
-                // We assume Collision.js will catch "Body vs Player".
-            }
-
+            // Stop charge?
             if (this.chargeDuration <= 0) {
                 this.isCharging = false;
                 this.speed = 4.0;
                 this.chargeCooldown = 5.0;
+                // Skidding stop?
             }
         } else {
-            // Normal Chase
+            // Normal behavior: Keep distance or Charge?
             this.chargeCooldown -= dt;
 
-            const dist = this.mesh.position.distanceTo(playerPos);
-            if (this.chargeCooldown <= 0 && dist < 35 && dist > 10) {
-                // Initiate Charge
-                this.isCharging = true;
-                this.chargeDuration = 1.5;
-                this.speed = 18.0; // Fast!
-
-                // Lock Direction
-                this.mesh.lookAt(playerPos.x, this.mesh.position.y, playerPos.z);
-                this.chargeDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
-
-                // Sound?
+            if (dist > 30) {
+                // Too far, speed up
+                this.speed = 6.0;
+                this.mesh.translateZ(this.speed * dt);
+            } else if (dist < 10) {
+                // Too close, swerve? Or keep moving to pass by (Hit & Run)
+                // If extremely close, slow down to look like maneuvering
+                this.speed = 4.0;
+                this.mesh.translateZ(this.speed * dt);
+            } else {
+                // Sweet spot (10-30m) - CHARGE!
+                if (this.chargeCooldown <= 0 && angle < 0.2) { // Only charge if roughly facing
+                    this.isCharging = true;
+                    this.playAnimation('attack', 2.0); // Pre-charge anim?
+                    this.speed = 20.0;
+                    this.chargeDuration = 2.0; // 2 seconds of dash
+                } else {
+                    // Cruise
+                    this.speed = 4.0;
+                    this.mesh.translateZ(this.speed * dt);
+                }
             }
-
-            // Delegate to base for turning/movement when not charging
-            super.update(dt, playerPos);
         }
 
         this.updateGroundPosition();
 
-        // Hover bob
-        this.mesh.position.y += Math.sin(Date.now() * 0.005) * 0.02;
+        // Hover Bob
+        const hoverH = Math.sin(Date.now() * 0.005) * 0.2;
+        this.mesh.position.y += hoverH;
+        // Tilt nose up/down based on speed/accel? 
+        // For now, simple bob.
     }
 }

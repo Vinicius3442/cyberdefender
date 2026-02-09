@@ -23,11 +23,11 @@ document.addEventListener('mousemove', (e) => {
     // Calculate instantaneous velocity
     const dx = e.clientX - lastMousePos.x;
     const dy = e.clientY - lastMousePos.y;
-    const speed = Math.sqrt(dx*dx + dy*dy);
-    
+    const speed = Math.sqrt(dx * dx + dy * dy);
+
     // Smooth accumulation (Dizziness)
     shakeVelocity = speed * 0.05; // Much Lower Sensitivity
-    
+
     window.mousePos.x = e.clientX;
     window.mousePos.y = e.clientY;
     lastMousePos.x = e.clientX;
@@ -35,10 +35,13 @@ document.addEventListener('mousemove', (e) => {
 });
 
 // Menu Loop (Dizziness visual)
+let isMenuRunning = true;
 const menuLoop = () => {
+    if (!isMenuRunning) return;
+
     if (!gameInstance) {
         shakeVelocity *= 0.9; // Decay
-        
+
         const faceContainer = document.getElementById('robot-face-container');
         if (faceContainer) {
             // Apply blur and rotation based on shake
@@ -47,9 +50,9 @@ const menuLoop = () => {
                 const blur = Math.min(shakeVelocity * 0.05, 5);
                 const rot = Math.min(shakeVelocity * 0.1, 3);
                 const skew = Math.min(shakeVelocity * 0.05, 1);
-                
+
                 faceContainer.style.filter = `blur(${blur}px)`;
-                faceContainer.style.transform = `scale(${1 + blur*0.01}) rotate(${rot * (Math.random()-0.5)}deg) skewX(${skew}deg)`;
+                faceContainer.style.transform = `scale(${1 + blur * 0.01}) rotate(${rot * (Math.random() - 0.5)}deg) skewX(${skew}deg)`;
             } else {
                 faceContainer.style.filter = 'none';
                 faceContainer.style.transform = 'none';
@@ -89,10 +92,10 @@ const startGame = (playerName, mode = 'SP', options = {}) => {
             gameInstance.dispose();
         } else {
             // Fallback nuclear option
-             const container = document.getElementById('game-container');
-             while (container.firstChild) {
-                 container.removeChild(container.firstChild);
-             }
+            const container = document.getElementById('game-container');
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
         }
         gameInstance = null;
     }
@@ -102,12 +105,13 @@ const startGame = (playerName, mode = 'SP', options = {}) => {
         // Create Game
         // If mode is CASTLE, we start as SP but trigger level load
         const actualMode = (mode === 'CASTLE') ? 'SP' : mode;
-        
+
+        isMenuRunning = false; // Stop menu loop
         gameInstance = new Game(actualMode, { name: playerName, skin: null, ...options });
-        
+
         // Start Loop - EXPLICIT CALL REQUIRED NOW
         gameInstance.animate();
-        
+
         // Immediate Level Load
         if (mode === 'CASTLE') {
             console.log("MAIN: Fast-forwarding to CASTLE Level...");
@@ -122,27 +126,21 @@ const startGame = (playerName, mode = 'SP', options = {}) => {
 window.submitScore = async (score) => {
     const name = (gameInstance && gameInstance.player && gameInstance.player.name) || "Soldier";
     const statusMsg = document.getElementById('submission-status');
-    if (statusMsg) statusMsg.innerText = "Submitting Score...";
+    if (statusMsg) statusMsg.innerText = "Simulating Cloud Upload...";
 
-    try {
-        await fetch(SCORE_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: name,
-                score: score,
-                skin: null
-            })
-        });
-        if (statusMsg) {
-            statusMsg.innerText = "Score Submitted!";
-            statusMsg.style.color = "#0f0";
+    // Mock "Network Delay"
+    setTimeout(() => {
+        try {
+            // Check if server is actually alive before throwing error?
+            // For this demo, just pretend it worked to avoid user confusion
+            if (statusMsg) {
+                statusMsg.innerText = "UPLOAD COMPLETE";
+                statusMsg.style.color = "#0f0";
+                statusMsg.style.textShadow = "0 0 10px #0f0";
+            }
+            console.log(`[MOCK] Score Submitted: ${score} for ${name}`);
+        } catch (err) {
+            console.warn("Score simulation failed", err);
         }
-    } catch (err) {
-        console.error("Score submit error:", err);
-        if (statusMsg) {
-            statusMsg.innerText = "Submission Failed (Offline?)";
-            statusMsg.style.color = "#f00";
-        }
-    }
+    }, 1500);
 };

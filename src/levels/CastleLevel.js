@@ -58,7 +58,8 @@ export class CastleLevel {
         this.player.teleport(this.game.spawnPoint);
         // Look at castle
         // Update lookAt to new Castle Position
-        this.player.camera.lookAt(0, 50, -2000);
+        // Fix: Don't look at top of tower to avoid CitadelEye damage trigger
+        this.player.camera.lookAt(0, 10, -1000); // Look low at gate, not eye
 
         document.body.requestPointerLock();
 
@@ -80,12 +81,12 @@ export class CastleLevel {
 
     spawnEye() {
         // Eye on top of the Central Tower
-        // New Tech Castle Spire is at z=-2000, height=800.
-        // Spire center y = 400 - 50 = 350?
-        // Let's put the eye at correct height. 
-        // Spire Y size 800. Positioned at y = 350. Top is ~750.
         const eyePos = new THREE.Vector3(0, 750, -2000);
         this.eye = new CitadelEye(this.scene, this.player, eyePos);
+        // FIX: Make it visibly huge
+        if (this.eye.mesh) {
+            this.eye.mesh.scale.set(10, 10, 10); // 10x larger
+        }
     }
 
     // Old spawnGuards removed.
@@ -108,7 +109,10 @@ export class CastleLevel {
         this.game.projectiles.forEach(p => {
             if (p.mesh) this.scene.remove(p.mesh);
         });
-        this.game.projectiles = []; // This is still a direct array in Game.js, so it's fine.
+
+        // CRITICAL FIX: Do NOT replace the array instance, or Collision.js loses reference!
+        this.game.projectiles.length = 0;
+
         // Remove world chunks?
         if (this.game.worldGen) {
             this.game.worldGen.clear();
@@ -117,9 +121,20 @@ export class CastleLevel {
 
     buildCastle() {
         // High Tech Castle (Sauron Tower Style)
-        // Delegate to WorldGenerator which now has the detailed "Sauron" implementation
         if (this.game.worldGen) {
             this.game.worldGen.spawnTechCastle();
+
+            // OPTIMIZATION: Disable Shadows on Props/Lights to fix GPU Crash
+            // Iterate scene to find the newly added lights?
+            // WorldGenerator pushes to 'this.props'.
+            this.game.worldGen.props.forEach(prop => {
+                prop.traverse(child => {
+                    if (child.isPointLight) {
+                        // Disable shadow for performance
+                        child.castShadow = false;
+                    }
+                });
+            });
         } else {
             console.error("WorldGenerator not found in CastleLevel!");
         }

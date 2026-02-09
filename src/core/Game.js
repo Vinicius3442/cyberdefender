@@ -889,11 +889,14 @@ export class Game {
     getWeightedRandomDrop() {
         const r = Math.random();
         // 40% Ammo, 20% Health (if we had it), 10% Weapon?
-        // Current logic:
         if (r < 0.4) return 'AMMO';
-        // Weapon drops?
-        // Let's return null mostly
-        return 'AMMO'; // Simplification for now, can expand
+
+        // Weapon Drops (Expand as needed)
+        if (r < 0.5) return 'Shotgun';
+        if (r < 0.6) return 'SMG';
+        if (r < 0.65) return 'PlasmaRifle'; // Rare
+
+        return 'AMMO'; // Fallback
     }
 
 
@@ -1160,7 +1163,11 @@ export class Game {
             }
 
             // Update Systems
-            if (this.entityManager) this.entityManager.update(dt);
+            // Update Systems
+            if (this.entityManager) {
+                // OPTIMIZATION: Logic Culling inside EntityManager.update (already verified)
+                this.entityManager.update(dt);
+            }
             if (this.waveManager) this.waveManager.update(dt);
             if (this.collision) this.collision.update(dt);
             this.particleSystem.update(dt);
@@ -1233,6 +1240,41 @@ export class Game {
     }
 
 
+
+    showGameOver() {
+        console.log("GAME: Game Over Triggered");
+        this.isPaused = true;
+
+        // Force unlock
+        document.exitPointerLock();
+        setTimeout(() => document.exitPointerLock(), 100); // Retry to be safe
+
+        const screen = document.getElementById('game-over-screen');
+        if (screen) {
+            screen.style.display = 'flex';
+            // Animation?
+            screen.style.opacity = '0';
+            setTimeout(() => screen.style.opacity = '1', 10);
+
+            const scoreEl = document.getElementById('final-score');
+            if (scoreEl && this.player) {
+                scoreEl.innerText = "SCORE: " + this.player.score;
+
+                // Show Death Cause
+                let causeEl = document.getElementById('death-cause');
+                if (!causeEl) {
+                    causeEl = document.createElement('div');
+                    causeEl.id = 'death-cause';
+                    causeEl.style.color = '#f00';
+                    causeEl.style.fontSize = '24px';
+                    causeEl.style.marginTop = '10px';
+                    causeEl.style.fontFamily = 'Courier New';
+                    scoreEl.parentNode.insertBefore(causeEl, scoreEl.nextSibling);
+                }
+                causeEl.innerText = "KILLED BY: " + (this.player.lastDamageSource || "UNKNOWN");
+            }
+        }
+    }
 
     showUpgradeScreen() {
         this.isPaused = true;

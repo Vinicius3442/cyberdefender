@@ -107,7 +107,7 @@ export class Collision {
                         if (proj.isExplosive) {
                             this.createExplosion(this._tempVec, proj.explosionRadius, proj.damage, true);
                         } else {
-                            this.player.takeDamage(proj.damage);
+                            this.player.takeDamage(proj.damage, "PROJECTILE");
                         }
                         proj.shouldRemove = true;
                         break;
@@ -175,7 +175,7 @@ export class Collision {
                     this.createExplosion(enemy.mesh.position, 5.0, enemy.damage, true);
                     enemy.die();
                 } else {
-                    this.player.takeDamage(0.5);
+                    this.player.takeDamage(0.5, "CONTACT: " + enemy.constructor.name.toUpperCase());
                 }
             }
 
@@ -184,10 +184,12 @@ export class Collision {
             // This fixes the issue where enemies swing but don't hit because body is far.
             if (enemy.currentAnim === 'attack' && enemy.damage > 0) {
                 const dist = enemy.mesh.position.distanceTo(this.player.position);
-                // Grace period? Or continuous? 
-                // Let's rely on cooldown in Enemy class, but here we check proximity.
-                // Attack Range + 1.0 buffer
-                if (dist < (enemy.attackRange || 3.0) + 1.5) {
+
+                // FIX: Ranged enemies have huge attackRange (25+). We must CAP the melee detection radius.
+                // Only allow melee hits if target is actually close (< 3.5 units)
+                const meleeThreshold = Math.min(enemy.attackRange || 3.0, 3.0) + 0.5;
+
+                if (dist < meleeThreshold) {
                     // Deal damage!
                     // To avoid 60 hits per second, we need a cooldown or state check.
                     // But Enemy.js manages 'attack' state duration.
@@ -195,7 +197,7 @@ export class Collision {
                     // Let's do low continuous damage simulating a "grinder" or adding a flag to enemy.
 
                     if (!enemy.hasDealtAttackDamage) {
-                        this.player.takeDamage(enemy.damage);
+                        this.player.takeDamage(enemy.damage, enemy.constructor.name.toUpperCase());
                         enemy.hasDealtAttackDamage = true; // Reset this when attack starts in Enemy.js
 
                         // Debug
@@ -224,7 +226,7 @@ export class Collision {
         // Damage Player
         if (damagePlayer) {
             if (position.distanceTo(this.player.position) <= radius) {
-                this.player.takeDamage(damage);
+                this.player.takeDamage(damage, "EXPLOSION");
             }
         }
     }

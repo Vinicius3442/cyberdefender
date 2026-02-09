@@ -9,7 +9,7 @@ export class KnightEnemy extends Enemy {
         this.speed = 7.0; // Fast chase
         this.damage = 25;
         this.scoreValue = 200;
-        this.attackRange = 4.0;
+        this.attackRange = 2.5; // Reduced from 4.0 to fix phantom range
         this.attackCooldown = 0;
     }
 
@@ -178,13 +178,25 @@ export class KnightEnemy extends Enemy {
         // Sword Swing
         if (this.sword) {
             // Simple chop
-            // t is 0..duration
-            // We need to implement proper animation state in Enemy.js to pass 't' properly,
-            // or just use sin wave here if 'attack' state is active.
-            // Enemy.js calls animAttack(this.animTimer).
-
             const phase = Math.sin(t * 10); // rapid swing
             this.sword.rotation.x = (Math.PI / 2) - phase;
+        }
+    }
+
+    animDie(t) {
+        // Kneel and fall
+        if (t < 0.5) {
+            this.mesh.rotation.x = t * Math.PI / 4; // Lean forward
+            this.mesh.position.y -= t * 0.05;
+        } else {
+            this.mesh.rotation.x = Math.PI / 2; // Flat
+            this.mesh.position.y = 0.5;
+        }
+
+        // Drop Sword
+        if (this.sword) {
+            this.sword.rotation.x += 0.1;
+            this.sword.position.y -= 0.02;
         }
     }
 }

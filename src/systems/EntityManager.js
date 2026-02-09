@@ -19,7 +19,9 @@ import { MountedKnightEnemy } from '../entities/MountedKnightEnemy.js';
 export class EntityManager {
     constructor(game) {
         this.game = game;
-        this.enemies = []; // Entity Storage
+        // CRITICAL FIX: Use the shared enemies array from Game instance
+        // otherwise Collision system (which holds reference to game.enemies) knows nothing about these entities.
+        this.enemies = game.enemies;
     }
 
     get scene() {

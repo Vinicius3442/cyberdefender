@@ -184,4 +184,21 @@ export class ArcherEnemy extends RangedEnemy {
             this.gunArm.position.y = THREE.MathUtils.lerp(this.gunArm.position.y, 1.2, 0.1);
         }
     }
+
+    animDie(t) {
+        // Fall over
+        this.mesh.rotation.x = t * Math.PI / 2;
+        this.mesh.position.y = Math.max(0.5, this.mesh.position.y - t * 0.1);
+
+        // Bow flies off
+        if (this.gunArm && t < 1.0) {
+            this.gunArm.position.y += 0.05;
+            this.gunArm.rotation.z += 0.2;
+            this.gunArm.position.x += 0.05;
+        }
+
+        // Legs crumple
+        if (this.leftLeg) this.leftLeg.rotation.x = -0.5;
+        if (this.rightLeg) this.rightLeg.rotation.x = 0.5;
+    }
 }
