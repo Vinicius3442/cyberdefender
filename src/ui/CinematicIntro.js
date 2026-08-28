@@ -130,16 +130,32 @@ export class CinematicIntro {
             ctx.restore();
         }
         
-        // Overlay Text
-        ctx.fillStyle = '#0f0';
-        ctx.font = '24px Courier New';
+        // Overlay Text & Letterbox Bars
+        // Top Letterbox Bar
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, 60);
+        // Bottom Letterbox Bar
+        ctx.fillRect(0, h - 60, w, 60);
+
+        ctx.fillStyle = '#00ffcc';
+        ctx.shadowColor = '#00ffcc';
+        ctx.shadowBlur = 10;
+        ctx.font = 'bold 22px "Courier New", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`ORBITAL STATION ALPHA`, 50, 50);
-        ctx.fillText(`DEPLOYING UNIT: CP-77`, 50, 80);
+        ctx.fillText(`ORBITAL STATION ALPHA [SYSTEM ACTIVE]`, 50, 40);
+        
+        ctx.fillStyle = '#ffcc00';
+        ctx.shadowColor = '#ffcc00';
+        ctx.fillText(`DEPLOYING UNIT: CYBER-DEFENDER CP-77`, 50, 95);
+
         if (this.podLaunched) {
-             ctx.fillStyle = '#f00';
-             ctx.fillText(`LAUNCH SEQUENCE INITIATED`, 50, 110);
+             ctx.fillStyle = '#ff0055';
+             ctx.shadowColor = '#ff0055';
+             ctx.shadowBlur = 15;
+             ctx.font = 'bold 26px "Courier New", monospace';
+             ctx.fillText(`>>> ATMOSPHERIC ENTRY INITIATED <<<`, 50, 135);
         }
+        ctx.shadowBlur = 0;
     }
     
     finish() {

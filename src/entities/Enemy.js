@@ -11,10 +11,13 @@ export class Enemy {
         this.damage = 10;
         this.scoreValue = 100;
 
-        // Create Mesh (Subclasses can override _createMesh to provide custom models)
+        // Bounding Box / Hitbox for fast & reliable collision
+        this.hitboxSize = new THREE.Vector3(1.2, 1.8, 1.2);
+        this.hitboxOffset = new THREE.Vector3(0, 0.9, 0);
+
+        // Create Mesh
         this.mesh = this._createMesh();
         this.mesh.position.copy(position);
-        // this.mesh.position.y = 0; // REMOVE: Respect passed Y (e.g. from WaveManager)
         this.mesh.castShadow = true;
 
         this.scene.add(this.mesh);
@@ -83,32 +86,25 @@ export class Enemy {
     takeDamage(amount) {
         this.hp -= amount;
 
-        // Skip flashing if already flashing to avoid color glitching
-        if (!this.isFlashing) {
-            this.playAnimation('hit'); // New: Trigger hit anim
+        // Flash effect without runtime material cloning (prevents WebGL shader re-compilation lag)
+        if (!this.isFlashing && this.mesh) {
+            this.playAnimation('hit');
 
             this.isFlashing = true;
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    if (!child.userData.hasClonedMaterial) {
-                        child.material = child.material.clone();
-                        child.userData.hasClonedMaterial = true;
-                    }
-
-                    // Handle Standard Material (Emissive)
                     if (child.material.emissive) {
-                        if (!child.material.userData.originalEmissive) {
+                        if (child.material.userData.originalEmissive === undefined) {
                             child.material.userData.originalEmissive = child.material.emissive.getHex();
+                            child.material.userData.originalIntensity = child.material.emissiveIntensity;
                         }
-                        child.material.emissive.setHex(0xffffff);
+                        child.material.emissive.setHex(0xff3333);
                         child.material.emissiveIntensity = 1.0;
-                    }
-                    // Handle Basic Material (Color Tint)
-                    else if (child.material.type === 'MeshBasicMaterial') {
-                        if (!child.material.userData.originalColor) {
+                    } else if (child.material.color) {
+                        if (child.material.userData.originalColor === undefined) {
                             child.material.userData.originalColor = child.material.color.getHex();
                         }
-                        child.material.color.setHex(0xffffff);
+                        child.material.color.setHex(0xff6666);
                     }
                 }
             });
@@ -119,16 +115,15 @@ export class Enemy {
                         if (child.isMesh && child.material) {
                             if (child.material.emissive && child.material.userData.originalEmissive !== undefined) {
                                 child.material.emissive.setHex(child.material.userData.originalEmissive);
-                                // Restore intensity if needed? Assuming default was used or we tracked it.
-                                child.material.emissiveIntensity = child.material.userData.originalIntensity || 0.5; // Default guess
-                            } else if (child.material.type === 'MeshBasicMaterial' && child.material.userData.originalColor !== undefined) {
+                                child.material.emissiveIntensity = child.material.userData.originalIntensity || 0;
+                            } else if (child.material.color && child.material.userData.originalColor !== undefined) {
                                 child.material.color.setHex(child.material.userData.originalColor);
                             }
                         }
                     });
                 }
                 this.isFlashing = false;
-            }, 100);
+            }, 80);
         }
 
         if (this.hp <= 0) {
@@ -144,11 +139,11 @@ export class Enemy {
         // Loot
         this.dropLoot();
 
-        // Dispatch Death Event
+        // Dispatch Death Event for visual effects
         const event = new CustomEvent('enemy-death', {
             detail: {
                 type: this.isExplosive ? 'EXPLOSION' : 'NORMAL',
-                position: this.mesh.position
+                position: this.mesh ? this.mesh.position.clone() : new THREE.Vector3()
             }
         });
         document.dispatchEvent(event);
@@ -157,13 +152,32 @@ export class Enemy {
         this.playAnimation('die');
         this.playingDeathAnim = true;
 
-        // Remove after animation
+        // Spawn light death particles immediately (optimized for high FPS)
+        if (this.scene && this.scene.userData && this.scene.userData.particleSystem && this.mesh) {
+            this.scene.userData.particleSystem.createExplosion(
+                this.mesh.position, 
+                this.isBoss ? 0xffaa00 : 0xaa2222, 
+                this.isBoss ? 15 : 4, 
+                this.isBoss ? 1.5 : 0.6
+            );
+        }
+
+        // Flag for removal after death animation completes
         setTimeout(() => {
             this.shouldRemove = true;
-            if (this.scene && this.mesh && this.mesh.parent === this.scene) {
-                this.scene.remove(this.mesh);
+        }, 400);
+    }
+
+    dispose() {
+        if (this.mesh) {
+            if (this.mesh.parent) {
+                this.mesh.parent.remove(this.mesh);
             }
-        }, 1000);
+            this.mesh.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+            });
+            this.mesh = null;
+        }
     }
 
     dropLoot() {

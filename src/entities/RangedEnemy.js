@@ -16,6 +16,9 @@ export class RangedEnemy extends Enemy {
         // this.headMesh = null; 
         // this.gunArm = null;
         this.hoverOffset = 0;
+
+        this.hitboxSize = new THREE.Vector3(1.4, 2.0, 1.4);
+        this.hitboxOffset = new THREE.Vector3(0, 1.0, 0);
     }
 
     _createMesh() {

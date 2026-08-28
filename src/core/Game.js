@@ -1203,15 +1203,11 @@ export class Game {
             }
 
             // UI Updates
-            this.renderHotbar(); // Keep hotbar synced
-            // UI Updates
-            this.renderHotbar(); // Keep hotbar synced
-
-            // Score Update
-            document.getElementById('score-display').innerText = this.player.score;
-
-            // Score Update
-            document.getElementById('score-display').innerText = this.player.score;
+            if (this._lastScore !== this.player.score) {
+                const scoreEl = document.getElementById('score-display');
+                if (scoreEl) scoreEl.innerText = this.player.score;
+                this._lastScore = this.player.score;
+            }
         }
 
         this.renderer.render(this.scene, this.camera);

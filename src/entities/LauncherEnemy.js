@@ -12,6 +12,9 @@ export class LauncherEnemy extends Enemy {
         this.attackRange = 30;
         this.attackCooldown = 4.0; 
         this.attackTimer = 0;
+
+        this.hitboxSize = new THREE.Vector3(1.6, 2.2, 1.6);
+        this.hitboxOffset = new THREE.Vector3(0, 1.1, 0);
         
         // Parts
         // Parts - initialized in _createMesh

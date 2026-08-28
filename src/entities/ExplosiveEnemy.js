@@ -12,6 +12,9 @@ export class ExplosiveEnemy extends Enemy {
         // Parts
         // Parts - initialized in _createMesh
         this.isExplosive = true;
+
+        this.hitboxSize = new THREE.Vector3(1.4, 1.6, 1.4);
+        this.hitboxOffset = new THREE.Vector3(0, 0.8, 0);
         // this.spikes = null;
         // this.core = null;
     }

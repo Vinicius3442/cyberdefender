@@ -11,6 +11,9 @@ export class KnightEnemy extends Enemy {
         this.scoreValue = 200;
         this.attackRange = 2.5; // Reduced from 4.0 to fix phantom range
         this.attackCooldown = 0;
+
+        this.hitboxSize = new THREE.Vector3(1.6, 2.4, 1.6);
+        this.hitboxOffset = new THREE.Vector3(0, 1.2, 0);
     }
 
     takeDamage(amount) {

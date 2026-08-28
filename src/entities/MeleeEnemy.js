@@ -8,6 +8,10 @@ export class MeleeEnemy extends Enemy {
         this.hp = 60;
         this.scoreValue = 150;
         this.damage = 15;
+
+        // Custom Spider Hitbox for 100% Tangibility
+        this.hitboxSize = new THREE.Vector3(2.4, 1.6, 2.4);
+        this.hitboxOffset = new THREE.Vector3(0, 0.8, 0);
     }
 
     _createMesh() {

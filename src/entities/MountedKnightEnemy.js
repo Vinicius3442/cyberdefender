@@ -15,6 +15,9 @@ export class MountedKnightEnemy extends Enemy {
         this.chargeDuration = 0;
         this.isCharging = false;
         this.chargeDir = new THREE.Vector3();
+
+        this.hitboxSize = new THREE.Vector3(2.5, 3.2, 3.5);
+        this.hitboxOffset = new THREE.Vector3(0, 1.6, 0);
     }
 
     _createMesh() {

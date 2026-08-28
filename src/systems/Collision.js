@@ -13,7 +13,8 @@ export class Collision {
         this._tempBox1 = new THREE.Box3();
         this._tempBox2 = new THREE.Box3();
         this._tempVec = new THREE.Vector3();
-        this._tempVec2 = new THREE.Vector3(); // FIX: Added second temp vector
+        this._tempVec2 = new THREE.Vector3();
+        this._tempVec3 = new THREE.Vector3();
         this._tempSize = new THREE.Vector3();
     }
 
@@ -75,10 +76,16 @@ export class Collision {
 
                 if (proj.isPlayerProjectile) {
                     for (const enemy of this.enemies) {
-                        if (enemy.isDead) continue;
+                        if (enemy.isDead || !enemy.mesh) continue;
 
-                        // Optimized Enemy Box (No alloc)
-                        this._tempBox2.setFromObject(enemy.mesh);
+                        // Fast & Reliable Hitbox (No matrix traversal lag, 100% tangible)
+                        if (enemy.hitboxSize) {
+                            const offset = enemy.hitboxOffset || this._tempVec2.set(0, 0.9, 0);
+                            this._tempVec3.copy(enemy.mesh.position).add(offset);
+                            this._tempBox2.setFromCenterAndSize(this._tempVec3, enemy.hitboxSize);
+                        } else {
+                            this._tempBox2.setFromObject(enemy.mesh);
+                        }
 
                         if (this._tempBox1.intersectsBox(this._tempBox2)) {
                             console.log("Hit registered on enemy!", enemy.constructor.name);
@@ -92,12 +99,12 @@ export class Collision {
                         }
                     }
                 } else {
-                    // Player Hitbox Fix
-                    const centerPos = this.player.position.clone(); // Can optimize this too but it's once per step
-                    centerPos.y -= 0.8;
+                    // Player Hitbox Fix (GC Free)
+                    this._tempVec3.copy(this.player.position);
+                    this._tempVec3.y -= 0.8;
 
                     this._tempBox2.setFromCenterAndSize(
-                        centerPos,
+                        this._tempVec3,
                         this._tempSize.set(0.6, 1.8, 0.6)
                     );
 
@@ -133,8 +140,15 @@ export class Collision {
             );
 
             for (const enemy of this.enemies) {
-                if (enemy.isDead) continue;
-                this._tempBox2.setFromObject(enemy.mesh);
+                if (!enemy || enemy.isDead || !enemy.mesh) continue;
+
+                if (enemy.hitboxSize) {
+                    const offset = enemy.hitboxOffset || this._tempVec2.set(0, 0.9, 0);
+                    this._tempVec3.copy(enemy.mesh.position).add(offset);
+                    this._tempBox2.setFromCenterAndSize(this._tempVec3, enemy.hitboxSize);
+                } else {
+                    this._tempBox2.setFromObject(enemy.mesh);
+                }
 
                 if (this._tempBox1.intersectsBox(this._tempBox2)) {
                     enemy.takeDamage(this.player.getCurrentWeaponConfig().damage);
@@ -143,17 +157,6 @@ export class Collision {
         }
 
         // 3. Enemies vs Player (Melee contact)
-        // 3. Enemies vs Player (Melee contact)
-        // Optimization: Calculate player box once
-        // Re-use _tempBox1 for player box
-        // NOTE: We need to use setFromCenterAndSize into a variable we keep valid for the loop
-        // But _tempBox1 is reused inside checkCollision if we are not careful?
-        // Utils.checkCollision typically takes two boxes.
-
-        // Let's use _tempBox1 for Player and _tempBox2 for Enemy. 
-        // We need to ensure we don't overwrite _tempBox1 while iterating.
-
-        // Player Box Construction (No Clone)
         this._tempVec.copy(this.player.position);
         this._tempVec.y -= 0.8;
 
@@ -163,13 +166,16 @@ export class Collision {
         );
 
         for (const enemy of this.enemies) {
-            if (enemy.isDead) continue;
+            if (!enemy || enemy.isDead || !enemy.mesh) continue;
 
-            // Optimization: No new Box3()
-            this._tempBox2.setFromObject(enemy.mesh);
+            if (enemy.hitboxSize) {
+                const offset = enemy.hitboxOffset || this._tempVec2.set(0, 0.9, 0);
+                this._tempVec3.copy(enemy.mesh.position).add(offset);
+                this._tempBox2.setFromCenterAndSize(this._tempVec3, enemy.hitboxSize);
+            } else {
+                this._tempBox2.setFromObject(enemy.mesh);
+            }
 
-            // Utils.checkCollision(box1, box2) - Check if it modifies boxes? 
-            // Usually intersectsBox is read-only.
             if (this._tempBox1.intersectsBox(this._tempBox2)) {
                 if (enemy.isExplosive || enemy instanceof ExplosiveEnemy) {
                     this.createExplosion(enemy.mesh.position, 5.0, enemy.damage, true);
@@ -179,29 +185,14 @@ export class Collision {
                 }
             }
 
-            // NEW: Active Melee Attack Logic (Sword/Lance/Baton)
-            // If enemy is attacking AND close enough, deal damage.
-            // This fixes the issue where enemies swing but don't hit because body is far.
             if (enemy.currentAnim === 'attack' && enemy.damage > 0) {
                 const dist = enemy.mesh.position.distanceTo(this.player.position);
-
-                // FIX: Ranged enemies have huge attackRange (25+). We must CAP the melee detection radius.
-                // Only allow melee hits if target is actually close (< 3.5 units)
                 const meleeThreshold = Math.min(enemy.attackRange || 3.0, 3.0) + 0.5;
 
                 if (dist < meleeThreshold) {
-                    // Deal damage!
-                    // To avoid 60 hits per second, we need a cooldown or state check.
-                    // But Enemy.js manages 'attack' state duration.
-                    // Simplest fix: Low damage per frame OR check a flag 'hasDealtDamage'.
-                    // Let's do low continuous damage simulating a "grinder" or adding a flag to enemy.
-
                     if (!enemy.hasDealtAttackDamage) {
                         this.player.takeDamage(enemy.damage, enemy.constructor.name.toUpperCase());
-                        enemy.hasDealtAttackDamage = true; // Reset this when attack starts in Enemy.js
-
-                        // Debug
-                        /* console.log("Enemy Hit Player!", enemy.constructor.name); */
+                        enemy.hasDealtAttackDamage = true;
                     }
                 }
             }

@@ -8,7 +8,9 @@ export class TankEnemy extends Enemy {
         this.speed = 1.2; // Very Slow
         this.damage = 30;
         this.scoreValue = 300;
-        
+
+        this.hitboxSize = new THREE.Vector3(2.0, 2.8, 2.0);
+        this.hitboxOffset = new THREE.Vector3(0, 1.4, 0);
     }
 
     _createMesh() {

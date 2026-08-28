@@ -116,14 +116,14 @@ export class CitadelEye {
             // Texture scroll?
         }
 
-        // 3. Check if Player is looking at Eye
+        // 3. Check if Player is looking at Eye within effective range (< 300 units)
         const toEye = new THREE.Vector3().subVectors(this.mesh.position, this.player.camera.position).normalize();
         const lookDir = this.player.camera.getWorldDirection(new THREE.Vector3());
 
         const dot = lookDir.dot(toEye);
 
-        // Threshold increased to 0.96 (approx 16 degrees) to prevent accidental hits
-        if (dot > 0.96) {
+        // Active damage only when close to the Citadel (< 300 units), facing direct vision, and player is not invulnerable
+        if (dist < 300 && dot > 0.96 && !this.player.isInvulnerable) {
             // Player is looking at the eye
             this.glitchIntensity = Math.min(this.glitchIntensity + dt * 2, 1);
 
@@ -140,9 +140,8 @@ export class CitadelEye {
             }
 
             // DAMAGE PLAYER
-            // Throttle damage to avoid performance kill (UI updates/Material cloning every frame)
             this.damageTimer = (this.damageTimer || 0) + dt;
-            if (this.damageTimer > 0.1) { // 10 ticks per second max
+            if (this.damageTimer > 0.2) {
                 if (this.player && this.player.takeDamage) {
                     this.player.takeDamage(this.damageRate * 0.1, "THE WATCHER");
                 }

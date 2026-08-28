@@ -46,8 +46,7 @@ export class Player {
         this.camera.rotation.order = 'YXZ';
 
         // Spawn Protection
-        this.isInvulnerable = true;
-        this.invulnerabilityTimer = 3.0;
+        this.resetImmunity(3.0);
 
         this.lastDamageTime = 0;
         this.damageCooldown = 0.2;
@@ -81,7 +80,16 @@ export class Player {
             this.shieldUI.style.textShadow = '2px 2px 0 #000';
             this.shieldUI.style.zIndex = '1000';
             this.shieldUI.style.display = 'none';
-            document.body.appendChild(this.shieldUI);
+        }
+    }
+
+    resetImmunity(duration = 2.5) {
+        this.isInvulnerable = true;
+        this.invulnerabilityTimer = duration;
+        if (this.shieldUI) {
+            this.shieldUI.style.display = 'block';
+            this.shieldUI.style.color = '#00ffff';
+            this.shieldUI.innerText = `SHIELD: ${duration.toFixed(1)}s`;
         }
     }
 

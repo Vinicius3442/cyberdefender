@@ -29,44 +29,55 @@ export class EntityManager {
     }
 
     update(dt) {
-        // Update Enemies
+        if (!this.game || !this.game.player) return;
         const playerPos = this.game.player.position;
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
 
+            if (!e) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
+
+            // Death cleanup
+            if (e.isDead && e.shouldRemove) {
+                this.removeEnemy(i);
+                continue;
+            }
+
+            if (!e.mesh) continue;
+
             // Logic Culling (Performance)
-            // Skip updates if too far, UNLESS it's a Boss or specialized type
             const dist = e.mesh.position.distanceTo(playerPos);
             if (dist > 1000 && !e.isBoss) {
-                e.mesh.visible = false; // Cull visual logic too if needed (frustum does this, but this ensures)
+                e.mesh.visible = false;
                 continue;
             } else {
                 e.mesh.visible = true;
             }
 
             e.update(dt, playerPos);
-
-            // Death cleanup
-            if (e.isDead && e.shouldRemove) {
-                this.removeEnemy(i);
-            }
         }
     }
 
     removeEnemy(index) {
         const e = this.enemies[index];
-        if (e.mesh) this.scene.remove(e.mesh);
+        if (!e) return;
 
+        // Splice from active array first to prevent access in concurrent loops
         this.enemies.splice(index, 1);
 
-        // Score & Drop Logic
-        if (this.game.player) this.game.player.score += 100;
+        // Safe disposal after array removal
+        if (e.dispose) {
+            e.dispose();
+        } else if (e.mesh) {
+            this.scene.remove(e.mesh);
+        }
 
-        if (Math.random() < 0.5) {
-            if (this.game.spawnRandomDrop) {
-                this.game.spawnRandomDrop(e.mesh.position.clone());
-            }
+        // Score & Drop Logic
+        if (this.game && this.game.player) {
+            this.game.player.score += (e.scoreValue || 100);
         }
     }
 

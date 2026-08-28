@@ -5,12 +5,13 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 8080;
 const DATA_FILE = path.join(__dirname, 'scores.json');
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' })); // Support larger payloads for skin images
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(express.static(__dirname));
 
 // Initialize Data File
 if (!fs.existsSync(DATA_FILE)) {

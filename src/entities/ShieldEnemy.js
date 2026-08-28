@@ -13,6 +13,9 @@ export class ShieldEnemy extends Enemy {
         this.isShieldActive = true;
         this.attackRange = 3.0;
         this.attackCooldown = 0;
+
+        this.hitboxSize = new THREE.Vector3(1.8, 2.2, 1.8);
+        this.hitboxOffset = new THREE.Vector3(0, 1.1, 0);
     }
 
     _createMesh() {

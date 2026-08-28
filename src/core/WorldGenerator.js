@@ -48,8 +48,7 @@ export class WorldGenerator {
     }
 
     createGround() {
-        // Post-Apocalyptic Ground (Charred/Dark)
-        // High segment count for large world to maintain terrain detail
+        // High-Tech Cyber Wavelength Ground
         const geometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 256, 256);
         
         const count = geometry.attributes.position.count;
@@ -58,37 +57,46 @@ export class WorldGenerator {
         const posAttribute = geometry.attributes.position;
         const colAttribute = geometry.attributes.color;
         
-        const colorLow = new THREE.Color(0x332211); // Dark scorched valley
-        const colorHigh = new THREE.Color(0x8b5a2b); // Lighter dust/sand peak
+        const colorLow = new THREE.Color(0x0d111a);  // Deep obsidian blue valley
+        const colorMid = new THREE.Color(0x2a1b3d);  // Cyber violet transition
+        const colorHigh = new THREE.Color(0x442255); // Scorched neon peak
+        const gridGlow = new THREE.Color(0x00ffcc);  // Glowing energy vein
         const tempColor = new THREE.Color();
 
         for (let i = 0; i < count; i++) {
             const x = posAttribute.getX(i);
             const y = posAttribute.getY(i); 
             
-            // Standard Mapping
             const worldX = x;
             const worldZ = -y; 
             
             const height = this.getHeight(worldX, worldZ);
-            posAttribute.setZ(i, height); // Displace "flat" plane
+            posAttribute.setZ(i, height);
 
-            // Vertex Coloring based on Height + Noise
-            // Normalize height roughly between -2 and 2
+            // Vertex Coloring based on Height + Synthwave Grid Veins
             let t = (height + 2) / 4; 
-            t += (Math.random() - 0.5) * 0.2; // Add noise
             t = Math.max(0, Math.min(1, t));
 
-            tempColor.lerpColors(colorLow, colorHigh, t);
+            if (t < 0.5) {
+                tempColor.lerpColors(colorLow, colorMid, t * 2);
+            } else {
+                tempColor.lerpColors(colorMid, colorHigh, (t - 0.5) * 2);
+            }
+
+            // Energy veins along grid interval
+            if (Math.abs(Math.sin(worldX * 0.05) * Math.cos(worldZ * 0.05)) > 0.95) {
+                tempColor.lerp(gridGlow, 0.4);
+            }
+
             colAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
         }
         
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-            vertexColors: true, // ENABLE VERTEX COLORS
-            roughness: 1.0,
-            metalness: 0.0
+            vertexColors: true,
+            roughness: 0.7,
+            metalness: 0.3
         });
 
         this.ground = new THREE.Mesh(geometry, material);
@@ -98,40 +106,37 @@ export class WorldGenerator {
     }
 
     createFoliage() {
-        // Dead Bushes using InstancedMesh (Efficient)
+        // Neon Crystal Foliage using InstancedMesh
         const instanceCount = 1500;
         
-        // Simple Geometry for Bush (2 Crossed Planes or a Tetrahedron)
-        // Tetrahedron is very low poly
-        const geometry = new THREE.TetrahedronGeometry(0.5, 0); 
-        const material = new THREE.MeshStandardMaterial({ color: 0x443322, roughness: 1.0 });
+        const geometry = new THREE.TetrahedronGeometry(0.6, 0); 
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0x00e5ff, 
+            emissive: 0x005577, 
+            emissiveIntensity: 0.6,
+            roughness: 0.2, 
+            metalness: 0.9 
+        });
 
         const mesh = new THREE.InstancedMesh(geometry, material, instanceCount);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
         const dummy = new THREE.Object3D();
-        // const color = new THREE.Color(); // Unused
 
         for (let i = 0; i < instanceCount; i++) {
-            // Random Position
             const angle = Math.random() * Math.PI * 2;
-            const r = 20 + Math.random() * (this.spawnRadius * 3); // Avoid center spawn (0-20)
+            const r = 20 + Math.random() * (this.spawnRadius * 3);
             
             const x = Math.cos(angle) * r;
             const z = Math.sin(angle) * r;
-            
-            // Get Height at position
             const y = this.getHeight(x, z);
 
-            dummy.position.set(x, y + 0.2, z);
-            
-            // Random Rotation
+            dummy.position.set(x, y + 0.3, z);
             dummy.rotation.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
             
-            // Random Scale
-            const s = 0.5 + Math.random() * 1.5;
-            dummy.scale.set(s, s, s);
+            const s = 0.6 + Math.random() * 1.4;
+            dummy.scale.set(s, s * 1.5, s);
 
             dummy.updateMatrix();
             mesh.setMatrixAt(i, dummy.matrix);
@@ -142,19 +147,19 @@ export class WorldGenerator {
     }
 
     createRuins() {
-        // Scatter broken walls and pillars
-        // Use InstancedMesh instead of individual Meshes
-        const numRuins = 40; // Total
-        const matConcrete = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
+        // Scatter cyber obelisks and glowing pillars
+        const numRuins = 50;
+        const matConcrete = new THREE.MeshStandardMaterial({ color: 0x1c202a, roughness: 0.4, metalness: 0.7 });
+        const matNeonStrip = new THREE.MeshBasicMaterial({ color: 0xff0055 });
         
         // 1. Walls
-        const wallGeo = new THREE.BoxGeometry(4, 3, 0.5);
+        const wallGeo = new THREE.BoxGeometry(4, 3.5, 0.6);
         const wallMesh = new THREE.InstancedMesh(wallGeo, matConcrete, numRuins);
         wallMesh.castShadow = true;
         wallMesh.receiveShadow = true;
         
         // 2. Pillars
-        const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, 6, 8);
+        const pillarGeo = new THREE.CylinderGeometry(0.6, 0.8, 7, 8);
         const pillarMesh = new THREE.InstancedMesh(pillarGeo, matConcrete, numRuins);
         pillarMesh.castShadow = true;
         pillarMesh.receiveShadow = true;
@@ -167,26 +172,23 @@ export class WorldGenerator {
             const x = (Math.random() - 0.5) * (this.spawnRadius * 2);
             const z = (Math.random() - 0.5) * (this.spawnRadius * 2);
             
-            if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+            if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
             
-            if (Math.random() > 0.5) {
-                // Wall
-                dummy.position.set(x, 1.5, z);
+            if (Math.random() > 0.4) {
+                dummy.position.set(x, 1.75, z);
                 dummy.rotation.set(0, Math.random() * Math.PI, 0);
                 dummy.scale.set(1 + Math.random(), 1 + Math.random()*0.5, 1);
                 dummy.updateMatrix();
                 wallMesh.setMatrixAt(wallCount++, dummy.matrix);
             } else {
-                // Pillar
                 dummy.position.set(x, 0.5, z);
-                dummy.rotation.set(0, Math.random() * Math.PI, Math.PI / 2); // Toppled
+                dummy.rotation.set(0, Math.random() * Math.PI, Math.PI / 2);
                 dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
                 pillarMesh.setMatrixAt(pillarCount++, dummy.matrix);
             }
         }
         
-        // Set count
         wallMesh.count = wallCount;
         pillarMesh.count = pillarCount;
         
@@ -197,38 +199,34 @@ export class WorldGenerator {
     }
 
     createCyberTrees() {
-        // Trees with glowing leaves (Neon style)
-        // Keep as Group for now since they are composite (Trunk + Cone)
-        // Optimization: Could be 2 InstancedMeshes (Trunks + Leaves)
-        
-        const numTrees = 20;
-        const matTrunk = new THREE.MeshStandardMaterial({ color: 0x443322 }); // Dry Wood
+        const numTrees = 25;
+        const matTrunk = new THREE.MeshStandardMaterial({ color: 0x111622, metalness: 0.8, roughness: 0.3 });
         const matLeaves = new THREE.MeshStandardMaterial({ 
-            color: 0xaa8844, // Dead leaves
-            emissive: 0x000000, 
-            emissiveIntensity: 0.0,
-            transparent: false,
-            opacity: 1.0
+            color: 0x00ffaa, 
+            emissive: 0x008855, 
+            emissiveIntensity: 0.7,
+            roughness: 0.2,
+            metalness: 0.5
         });
 
         for (let i = 0; i < numTrees; i++) {
             const x = (Math.random() - 0.5) * (this.spawnRadius * 2);
             const z = (Math.random() - 0.5) * (this.spawnRadius * 2);
             
-            if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+            if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
 
             const group = new THREE.Group();
             
             // Trunk
-            const height = 4 + Math.random() * 3;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, height, 6), matTrunk);
+            const height = 5 + Math.random() * 4;
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.7, height, 8), matTrunk);
             trunk.position.y = height / 2;
             trunk.castShadow = true;
             group.add(trunk);
 
             // Leaves (Cones)
-            const foliage = new THREE.Mesh(new THREE.ConeGeometry(2.5, 4, 8), matLeaves);
-            foliage.position.y = height + 1;
+            const foliage = new THREE.Mesh(new THREE.ConeGeometry(2.8, 5, 8), matLeaves);
+            foliage.position.y = height + 1.5;
             foliage.castShadow = true;
             group.add(foliage);
 

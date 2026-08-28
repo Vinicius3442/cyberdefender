@@ -11,6 +11,9 @@ export class SniperEnemy extends Enemy {
         this.attackRange = 40;
         this.attackCooldown = 3.5;
         this.attackTimer = 0;
+
+        this.hitboxSize = new THREE.Vector3(1.4, 2.2, 1.4);
+        this.hitboxOffset = new THREE.Vector3(0, 1.1, 0);
         
         // Parts
         // Parts - initialized in _createMesh

@@ -9,6 +9,9 @@ export class Boss extends Enemy {
         this.maxHp = 5000;
         this.hp = 5000;
         this.mesh.position.copy(position);
+
+        this.hitboxSize = new THREE.Vector3(5.0, 8.0, 5.0);
+        this.hitboxOffset = new THREE.Vector3(0, 4.0, 0);
         
         // Cleanup default mesh from Enemy constructor if we plan to replace it
         // But for now subclasses will likely rebuild this.mesh
