@@ -1,4 +1,4 @@
-# 🛡️ CyberDefender — 3D Cyberpunk FPS Engine
+# CyberDefender — 3D Cyberpunk FPS Roguelike
 
 ![Three.js](https://img.shields.io/badge/Three.js-r185-black?style=for-the-badge&logo=three.js)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?style=for-the-badge&logo=javascript)
@@ -6,13 +6,13 @@
 ![Node.js](https://img.shields.io/badge/Node.js-Express-green?style=for-the-badge&logo=node.js)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
-**CyberDefender** é um jogo de tiro em primeira pessoa (FPS 3D) cyberpunk e retrô-futurista de alta performance, construído diretamente para navegadores web utilizando **Three.js**, **Vanilla JavaScript (ES6 Modules)**, **PeerJS (WebRTC)** e um servidor dedicado de pontuações em **Node.js/Express**.
+**CyberDefender** é um jogo de tiro em primeira pessoa (FPS 3D), roguelike, cyberpunk e retrô-futurista. construído diretamente para navegadores web utilizando **Three.js**, **Vanilla JavaScript (ES6 Modules)**, **PeerJS (WebRTC)** e um servidor dedicado de pontuações em **Node.js/Express**.
 
-O projeto destaca-se por combinar gráficos 3D fluidos, combate frenético contra hordas de IA, batalhas de chefões multicamadas, terminal interativo de linha de comando (`CyberOS`), e suporte a rede P2P em tempo real — tudo isso sem depender de engines pesadas de terceiros (como Unity ou Unreal).
+O projeto destaca-se por combinar gráficos 3D fluidos, combate frenético contra hordas de IA, batalhas de chefões multicamadas, terminal interativo de linha de comando(relacionado a sinopse) — tudo isso sem depender de engines pesadas de terceiros (como Unity ou Unreal).
 
 ---
 
-## 📌 Sumário
+## Sumário
 - [O Conceito Central](#-o-conceito-central)
 - [Arquitetura do Motor & Sistemas Core](#-arquitetura-do-motor--sistemas-core)
   - [1. Engine 3D & Pipeline de Renderização](#1-engine-3d--pipeline-de-renderização)
@@ -26,7 +26,7 @@ O projeto destaca-se por combinar gráficos 3D fluidos, combate frenético contr
 
 ---
 
-## 🎯 O Conceito Central
+## O Conceito Central
 
 ![Visão Geral do CyberDefender](./Assets/cyberhome.png)
 
@@ -37,7 +37,7 @@ O objetivo do jogador em **CyberDefender** é assumir o controle de um soldado c
 
 ---
 
-## 🧠 Arquitetura do Motor & Sistemas Core
+## Arquitetura do Motor & Sistemas Core
 
 ### 1. Engine 3D & Pipeline de Renderização
 A arquitetura do motor é modular e desacoplada, dividida em gerenciadores especializados:
@@ -75,9 +75,9 @@ O sistema de armas (`WeaponFactory.js` e `WeaponSystem.js`) simula balística re
 
 ---
 
-## 🎮 Mecânicas de Jogo e Ferramentas Livres
+## Mecânicas de Jogo e Ferramentas Livres
 
-### 💻 O Terminal CyberOS & Shell Interativo
+### O Terminal CyberOS & Shell Interativo
 Em vez de um menu principal genérico, o jogo inicia através da interface de linha de comando **CyberOS** com um robô em Canvas interativo que rastreia os movimentos do cursor:
 
 ![Terminal CyberOS](./Assets/cybershell.png)
@@ -92,31 +92,30 @@ Em vez de um menu principal genérico, o jogo inicia através da interface de li
 
 ---
 
-### 👹 Confrontos Épicos de Chefões (Boss Fights)
+### Confrontos Épicos de Chefões (Boss Fights)
 A cada marco de ondas, o jogador enfrenta chefões massivos com barras de vida independentes e mecânicas de fases:
 
 > [!WARNING]
 > Ao detectar uma assinatura de alta energia (`WARNING: HIGH ENERGY SIGNATURE DETECTED`), a arena entra em modo de bloqueio e o boss assume o combate!
 
-* **ED-209 Boss:** Mecha bípede com rajadas de metralhadoras duplas e mísseis guiados.
+* **ED-209 Boss:** Mecha bípede com rajadas de metralhadoras duplas e mísseis guiados (Robocop).
 * **Observer Boss:** Olho mecânico gigante com lasers giratórios de 360° e invocação de lacaios.
 * **The Herald:** Entidade cibernética de alta mobilidade com padrões de ataque baseados em fases.
 * **Atom Boss:** Núcleo de energia com campos de repulsão eletromagnética e tempestades de plasma.
 
 ---
 
-### 🌐 Rede P2P Multiplayer & Global Leaderboard
-* **Multiplayer P2P (PeerJS / WebRTC):** Permite conexões diretas entre jogadores (*Peer-to-Peer*) para sessões cooperativas ou modos versus sem necessidade de servidores intermediários de jogo.
+### Redde P2P Multiplayer & Global Leaderboard
 * **Servidor Node.js & Express (`server.js`):** API REST dedicada que armazena os recordes globais (`/api/leaderboard`) e sincroniza o *Hall da Fama* diretamente no terminal CyberOS.
 
 ---
 
-## 🚀 Executando o Projeto & Servidor
+## Executando o Projeto & Servidor
 
 ### Pré-requisitos
 * **Navegador Moderno:** Chrome, Firefox, Edge ou Brave com suporte a ES6 Modules e WebGL.
 * **Node.js (Opcional, para o servidor de Leaderboard):** v16+ instalado.
-
+Você pode jogar diretamente pelo github pages, embora seu historico de pontos não será armazenado.
 ### 1. Modo Cliente (Direto no Navegador)
 Não é necessário compilar nada. Abra diretamente o arquivo `index.html` em um servidor local HTTP (como Live Server ou `npx serve`):
 ```bash
@@ -139,4 +138,5 @@ O servidor estará rodando em `http://localhost:8080` com a API em `http://local
 ---
 
 > [!TIP]
-> **Dev Console Embutido:** Durante o jogo, abra o console de desenvolvedor ou use os comandos do `CyberOS` para testar armas, alternar mapas e debugar a IA dos inimigos em tempo real.
+> **Dev Console Embutido:** Durante o jogo, abra o console de desenvolvedor ou use os comandos do `CyberOS` para testar armas, alternar mapas e debugar a IA dos inimigos em tempo real, aperte a tecla de aspas do teclado para isso.
+
